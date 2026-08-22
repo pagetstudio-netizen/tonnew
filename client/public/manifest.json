@@ -1,0 +1,24 @@
+{
+  "name": "Stone by ton",
+  "short_name": "Stone by ton",
+  "description": "Stone by ton is a French company founded in 2013, specializing in the online and physical sale of natural stone, travertine, tiles, and wall cladding. Based in Six-Fours-les-Plages in the Var region, the brand offers a wide range of coverings for indoor and outdoor floors and walls.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#00CC2C",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/favicon.png?v=ton",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon.png?v=ton",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
