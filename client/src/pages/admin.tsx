@@ -13,6 +13,7 @@ import AdminPaymentNumbers from "@/components/admin/payment-numbers";
 import AdminSettings from "@/components/admin/settings";
 import AdminGiftCodes from "@/components/admin/gift-codes";
 import AdminCountries from "@/components/admin/countries";
+import AdminBlockedIps from "@/components/admin/blocked-ips";
 
 export default function AdminPage() {
   const { user } = useAuth();
@@ -43,6 +44,7 @@ export default function AdminPage() {
               <TabsTrigger value="countries" data-testid="tab-countries">Pays</TabsTrigger>
               <TabsTrigger value="giftcodes" data-testid="tab-giftcodes">Codes Cadeaux</TabsTrigger>
               <TabsTrigger value="settings" data-testid="tab-settings">Parametres</TabsTrigger>
+              <TabsTrigger value="security" data-testid="tab-security">Sécurité</TabsTrigger>
             </TabsList>
           </div>
 
@@ -80,6 +82,9 @@ export default function AdminPage() {
 
           <TabsContent value="settings" className="mt-4">
             <AdminSettings isSuperAdmin={user.isSuperAdmin} />
+          </TabsContent>
+          <TabsContent value="security" className="mt-4">
+            <AdminBlockedIps />
           </TabsContent>
         </Tabs>
       </div>

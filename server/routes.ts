@@ -39,6 +39,7 @@ import {
   mapAshtechStatus,
   AshtechApiError,
 } from "./ashtechpay";
+import { formatTelegramValue, sendTelegramMessage, sendTelegramSecurityAlert } from "./telegram";
 import express from "express";
 
 // --- Brute-force protection (in-memory) ---
@@ -72,12 +73,25 @@ function recordFailedAttempt(req: Request) {
   if (record.count >= MAX_LOGIN_ATTEMPTS) {
     record.blockedUntil = now + BLOCK_DURATION_MS;
     record.count = 0;
+    void sendTelegramSecurityAlert(
+      key,
+      "Trop de tentatives. Réessayez dans 15 minute(s).",
+    ).catch((error) => console.error("[telegram] security notification failed:", error.message));
   }
   loginAttempts.set(key, record);
 }
 
 function clearFailedAttempts(req: Request) {
   loginAttempts.delete(getClientKey(req));
+}
+
+function getBlockedIps(value: string | undefined): string[] {
+  try {
+    const parsed = JSON.parse(value || "[]");
+    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : [];
+  } catch {
+    return [];
+  }
 }
 // --- end brute-force protection ---
 
@@ -96,6 +110,15 @@ async function creditApprovedDeposit(deposit: { id: number; userId: number; amou
     description: `Dépôt RobotPay #${deposit.id}`,
   });
   await storage.processDepositReferralCommissions(user.id, deposit.amount);
+  void sendTelegramMessage(
+    [
+      "✅ <b>Dépôt validé</b>",
+      `Utilisateur : ${formatTelegramValue(user.fullName)}`,
+      `Montant : <b>${formatTelegramValue(deposit.amount)} XOF</b>`,
+      `Référence : ${formatTelegramValue(deposit.id)}`,
+      `Pays : ${formatTelegramValue(user.country)}`,
+    ].join("\n"),
+  ).catch((error) => console.error("[telegram] deposit notification failed:", error.message));
 }
 
 declare module "express-session" {
@@ -224,6 +247,19 @@ export async function registerRoutes(
     })
   );
 
+  app.use(async (req, res, next) => {
+    try {
+      const blockedIps = getBlockedIps(await storage.getSetting("blockedIps"));
+      if (blockedIps.includes(getClientKey(req))) {
+        return res.status(403).json({ message: "Accès bloqué pour cette adresse IP" });
+      }
+      next();
+    } catch (error) {
+      console.error("[security] IP block check failed:", error);
+      next();
+    }
+  });
+
   // Auth routes
   app.post("/api/auth/register", async (req, res) => {
     try {
@@ -295,6 +331,16 @@ export async function registerRoutes(
 
       clearFailedAttempts(req);
       req.session.userId = user.id;
+      if (user.isAdmin) {
+        void sendTelegramMessage(
+          [
+            "🔐 <b>Connexion administrateur</b>",
+            `Administrateur : ${formatTelegramValue(user.fullName)}`,
+            `Pays : ${formatTelegramValue(user.country)}`,
+            `Adresse IP : ${formatTelegramValue(getClientKey(req))}`,
+          ].join("\n"),
+        ).catch((error) => console.error("[telegram] admin login notification failed:", error.message));
+      }
       res.json({ user: { ...user, password: undefined } });
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -1171,6 +1217,17 @@ export async function registerRoutes(
         });
       }
       const message = error.message || "Erreur AshtechPay";
+      const errorUser = await storage.getUser(req.session.userId!);
+      void sendTelegramMessage(
+        [
+          "❌ <b>Erreur de dépôt</b>",
+          `Utilisateur : ${formatTelegramValue(errorUser?.fullName || "Inconnu")}`,
+          `Montant : <b>${formatTelegramValue(req.body?.amount)} XOF</b>`,
+          `Pays : ${formatTelegramValue(req.body?.country)}`,
+          `Opérateur : ${formatTelegramValue(req.body?.operator)}`,
+          `Erreur exacte : <code>${formatTelegramValue(message)}</code>`,
+        ].join("\n"),
+      ).catch((notificationError) => console.error("[telegram] deposit error notification failed:", notificationError.message));
       console.error("[ashtechpay] collect error:", message);
       res.status(400).json({ message });
     }
@@ -1649,6 +1706,18 @@ export async function registerRoutes(
         paymentMethod: wallet.paymentMethod,
         status: "pending",
       });
+
+      void sendTelegramMessage(
+        [
+          "💸 <b>Retrait lancé</b>",
+          `Utilisateur : ${formatTelegramValue(user.fullName)}`,
+          `Montant : <b>${formatTelegramValue(amount)} XOF</b>`,
+          `Net après frais : ${formatTelegramValue(netAmount)} XOF`,
+          `Méthode : ${formatTelegramValue(wallet.paymentMethod)}`,
+          `Pays : ${formatTelegramValue(wallet.country)}`,
+          `ID retrait : ${formatTelegramValue(withdrawal.id)}`,
+        ].join("\n"),
+      ).catch((error) => console.error("[telegram] withdrawal notification failed:", error.message));
 
       res.json(withdrawal);
     } catch (error: any) {
@@ -2338,6 +2407,44 @@ export async function registerRoutes(
       res.json(adminSettings(settings));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/blocked-ips", requireAdmin, async (_req, res) => {
+    try {
+      res.json(getBlockedIps(await storage.getSetting("blockedIps")));
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/admin/blocked-ips", requireAdmin, async (req, res) => {
+    try {
+      const ip = String(req.body?.ip || "").trim();
+      const net = await import("net");
+      if (!net.isIP(ip)) return res.status(400).json({ message: "Adresse IP invalide" });
+      const blockedIps = getBlockedIps(await storage.getSetting("blockedIps"));
+      if (!blockedIps.includes(ip)) {
+        blockedIps.push(ip);
+        await storage.setSetting("blockedIps", JSON.stringify(blockedIps), req.session.userId);
+      }
+      await storage.logAdminAction(req.session.userId!, "block_ip", null, `Adresse IP bloquée: ${ip}`);
+      res.json({ success: true, ip });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/admin/blocked-ips/:ip", requireAdmin, async (req, res) => {
+    try {
+      const ip = decodeURIComponent(req.params.ip);
+      const blockedIps = getBlockedIps(await storage.getSetting("blockedIps"));
+      const nextIps = blockedIps.filter((value) => value !== ip);
+      await storage.setSetting("blockedIps", JSON.stringify(nextIps), req.session.userId);
+      await storage.logAdminAction(req.session.userId!, "unblock_ip", null, `Adresse IP débloquée: ${ip}`);
+      res.json({ success: true, ip });
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
     }
   });
 
