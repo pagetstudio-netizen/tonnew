@@ -509,6 +509,10 @@ export default function DepositPage() {
       toast({ title: "Pays requis", description: "Sélectionnez le pays du paiement.", variant: "destructive" });
       return;
     }
+    if (westpayAvailable) {
+      wpInitiateMutation.mutate();
+      return;
+    }
     window.location.href = `/robotpay?amount=${encodeURIComponent(Number(amount))}&country=${encodeURIComponent(depositCountry)}`;
   };
 
@@ -765,7 +769,7 @@ export default function DepositPage() {
         <button
           className="continue"
           onClick={handleAmountNext}
-          disabled={!depositCountry}
+          disabled={!depositCountry || wpInitiateMutation.isPending}
         >
           Recharger maintenant
         </button>

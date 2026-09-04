@@ -8,7 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { COUNTRIES, type ApiCountry } from "@/lib/countries";
 import type { PaymentNumber } from "@shared/schema";
 
-type Provider = "ashtech" | "westpay" | "sendavapay";
+type Provider = "ashtech" | "sendavapay";
 type Operator = { id?: string; name?: string; operator?: string; slug?: string; code?: string; requiresOtp?: boolean; status?: string; provider?: Provider; manualNumber?: PaymentNumber };
 type ProviderInfo = { provider: Provider; name: string; providers?: Array<{ provider: Provider; name: string }> };
 
@@ -113,13 +113,10 @@ export default function RobotPayPage() {
     ? (ashtechCountryList.find((c: any) => c.code?.toUpperCase() === country)?.operators || [])
       .map((x: any) => typeof x === "string" ? { name: x, id: x, provider: "ashtech" as const } : { ...x, provider: "ashtech" as const })
     : [];
-  const westpayOperators: Operator[] = availableProviders.some(item => item.provider === "westpay")
-    ? [{ name: "Paiement en ligne", id: "westpay", provider: "westpay" as const }]
-    : [];
   const sendavaOperators: Operator[] = availableProviders.some(item => item.provider === "sendavapay")
     ? (sendavaData?.data || []).filter((x: Operator) => x.status === "online").map(x => ({ ...x, provider: "sendavapay" as const }))
     : [];
-  const automaticOperators: Operator[] = [...ashtechOperators, ...westpayOperators, ...sendavaOperators];
+  const automaticOperators: Operator[] = [...ashtechOperators, ...sendavaOperators];
   const normalizeOperatorName = (value: unknown) =>
     String(value || "")
       .normalize("NFD")
@@ -216,19 +213,6 @@ export default function RobotPayPage() {
       toast({ title: "Erreur de paiement", description: e.message, variant: "destructive" });
     },
   });
-  const westpayMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/deposits", {
-        amount, accountName: user?.fullName || "", accountNumber: paymentPhone,
-        paymentMethod: "WestPay", country, useWestpay: true,
-      });
-      if (!res.ok) throw new Error((await res.json()).message || "WestPay indisponible");
-      return res.json();
-    },
-    onSuccess: (data) => { setDepositId(data.deposit?.id || null); setRedirectUrl(data.westpayUrl || ""); setStep(2); setStatus("processing"); },
-    onError: (e: any) => toast({ title: "Erreur WestPay", description: e.message, variant: "destructive" }),
-  });
-
   const manualMutation = useMutation({
     mutationFn: async () => {
       const number = operator?.manualNumber;
@@ -260,7 +244,7 @@ export default function RobotPayPage() {
   });
 
   useEffect(() => {
-    if (step !== 2 || !depositId || status === "approved" || activeProvider === "westpay") return;
+    if (step !== 2 || !depositId || status === "approved") return;
     const timer = setInterval(async () => {
       const url = activeProvider === "ashtech" ? `/api/deposits/${depositId}/ashtechpay-status` : `/api/deposits/${depositId}/sendavapay-status`;
       const res = await fetch(url, { credentials: "include" });
@@ -277,7 +261,6 @@ export default function RobotPayPage() {
     if (!operator) { toast({ title: "Opérateur requis", description: "Sélectionnez votre opérateur.", variant: "destructive" }); return; }
     if (operator.manualNumber) manualMutation.mutate();
     else if (activeProvider === "ashtech") ashtechMutation.mutate(undefined);
-    else if (activeProvider === "westpay") westpayMutation.mutate();
     else sendavaMutation.mutate();
   };
   const submitOtp = async () => {
@@ -290,7 +273,7 @@ export default function RobotPayPage() {
     if (!res.ok) { toast({ title: "OTP invalide", variant: "destructive" }); return; }
     setStep(2); setStatus("processing");
   };
-  const busy = sendavaMutation.isPending || ashtechMutation.isPending || westpayMutation.isPending || manualMutation.isPending;
+  const busy = sendavaMutation.isPending || ashtechMutation.isPending || manualMutation.isPending;
 
   const copyPaymentNumber = async () => {
     const number = operator?.manualNumber;

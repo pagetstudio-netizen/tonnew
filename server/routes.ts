@@ -2626,13 +2626,9 @@ export async function registerRoutes(
       const enabledCodes = (value: string | undefined) =>
         (value || "").split(",").map(code => code.trim().toUpperCase()).filter(Boolean);
       const ashtechCountries = enabledCodes(settings.ashtechCountries);
-      const westpayCountries = enabledCodes(settings.westpayCountries);
-      const providers: Array<{ provider: "ashtech" | "westpay" | "sendavapay"; name: string }> = [];
+      const providers: Array<{ provider: "ashtech" | "sendavapay"; name: string }> = [];
       if (settings.ashtechEnabled === "true" && ashtechCountries.includes(country)) {
         providers.push({ provider: "ashtech", name: settings.ashtechChannelName || "AshtechPay" });
-      }
-      if (settings.westpayEnabled === "true" && westpayCountries.includes(country)) {
-        providers.push({ provider: "westpay", name: settings.westpayChannelName || "WestPay" });
       }
       if (settings.sendavapayEnabled === "true") {
         providers.push({ provider: "sendavapay", name: settings.sendavapayChannelName || "SendavaPay" });
