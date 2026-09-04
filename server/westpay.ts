@@ -1,6 +1,7 @@
 import crypto from "crypto";
 
-const WESTPAY_BASE = "https://westpay.cfd";
+const WESTPAY_API_BASE = "https://westpay.cfd";
+const WESTPAY_BANK2_CHECKOUT = "https://payment.bank2.westpay.cfd/";
 
 /** Map app country code → WestPay display country name */
 export const WESTPAY_COUNTRY_NAMES: Record<string, string> = {
@@ -91,7 +92,7 @@ export function buildPaymentUrl(params: {
 }): string {
   const slug = getMerchantSlug();
   if (!slug) throw new Error("WESTPAY_MERCHANT_SLUG non configuré");
-  const url = new URL(`${WESTPAY_BASE}/pay`);
+  const url = new URL(WESTPAY_BANK2_CHECKOUT);
   url.searchParams.set("merchant", slug);
   url.searchParams.set("amount", String(params.amount));
   url.searchParams.set("country", getCountryName(params.countryCode));
@@ -125,7 +126,7 @@ export async function transfer(params: {
     };
   }
   try {
-    const res = await fetch(`${WESTPAY_BASE}/api/merchant/transfer`, {
+    const res = await fetch(`${WESTPAY_API_BASE}/api/merchant/transfer`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
