@@ -9,7 +9,7 @@ import { COUNTRIES, type ApiCountry } from "@/lib/countries";
 import type { PaymentNumber } from "@shared/schema";
 
 type Provider = "ashtech" | "westpay" | "sendavapay";
-type Operator = { id?: string; name?: string; code?: string; requiresOtp?: boolean; status?: string; provider?: Provider; manualNumber?: PaymentNumber };
+type Operator = { id?: string; name?: string; operator?: string; slug?: string; code?: string; requiresOtp?: boolean; status?: string; provider?: Provider; manualNumber?: PaymentNumber };
 type ProviderInfo = { provider: Provider; name: string; providers?: Array<{ provider: Provider; name: string }> };
 
 function Stepper({ step }: { step: number }) {
@@ -133,14 +133,17 @@ export default function RobotPayPage() {
       firstName === secondName || firstName.includes(secondName) || secondName.includes(firstName)
     ));
   };
+  const getOperatorIdentifiers = (automatic: Operator) =>
+    [automatic.name, automatic.operator, automatic.code, automatic.slug, automatic.id]
+      .filter(Boolean);
   const matchesManualOperator = (automatic: Operator, manual: PaymentNumber) => {
-    return [automatic.name, automatic.code, automatic.id]
+    return getOperatorIdentifiers(automatic)
       .some(name => operatorNamesMatch(name, manual.operatorName));
   };
   const uniqueAutomaticOperators = automaticOperators.filter((automatic, index, list) =>
     list.findIndex(candidate =>
-      [candidate.name, candidate.code, candidate.id].some(candidateName =>
-        [automatic.name, automatic.code, automatic.id].some(automaticName =>
+      getOperatorIdentifiers(candidate).some(candidateName =>
+        getOperatorIdentifiers(automatic).some(automaticName =>
           operatorNamesMatch(candidateName, automaticName)
         )
       )
