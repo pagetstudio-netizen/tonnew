@@ -14,6 +14,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { formatCurrency } from "@/lib/countries";
 import { Search, Edit, Ban, Shield, Lock, Unlock, Star, Users, Loader2, UserPlus, ChevronDown, ChevronUp, Trash2, ChevronLeft, ChevronRight, Landmark } from "lucide-react";
 import type { User, Product } from "@shared/schema";
+import { ADMIN_PATH } from "@/lib/admin-path";
 
 interface UserProductItem {
   id: number;
@@ -296,7 +297,7 @@ export default function AdminUsers({ isSuperAdmin }: AdminUsersProps) {
                     )}
                   </div>
                   <div className="flex gap-1">
-                    <Button size="sm" variant="outline" onClick={() => navigate(`/admin/team/${user.id}`)}>
+                    <Button size="sm" variant="outline" onClick={() => navigate(`${ADMIN_PATH}/team/${user.id}`)}>
                       <Users className="w-4 h-4 mr-1" />
                       Equipe
                     </Button>

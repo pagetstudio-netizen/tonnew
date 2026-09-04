@@ -17,6 +17,7 @@ interface Country {
   name: string;
   currency: string;
   phonePrefix: string;
+  operators: string;
   isActive: boolean;
 }
 
@@ -34,6 +35,7 @@ export default function AdminPaymentNumbers() {
   const [form, setForm] = useState(emptyForm);
   const [manualCountry, setManualCountry] = useState(false);
   const [manualCountryInput, setManualCountryInput] = useState("");
+  const [customOperator, setCustomOperator] = useState(false);
 
   const { data: numbers = [], isLoading } = useQuery<PaymentNumber[]>({
     queryKey: ["/api/admin/payment-numbers"],
@@ -101,15 +103,18 @@ export default function AdminPaymentNumbers() {
     setForm({ ...emptyForm, country: defaultCountry });
     setManualCountry(false);
     setManualCountryInput("");
+    setCustomOperator(false);
     setShowForm(true);
   };
 
   const openEdit = (num: PaymentNumber) => {
     setEditTarget(num);
     const isKnown = countries.some(c => c.code === num.country);
+    const countryOperators = getOperatorsForCountry(num.country);
     setManualCountry(!isKnown);
     setManualCountryInput(!isKnown ? num.country : "");
     setForm({ ownerName: num.ownerName, phone: num.phone, operatorName: num.operatorName, country: isKnown ? num.country : "", logoUrl: num.logoUrl || "", isActive: num.isActive });
+    setCustomOperator(isKnown && countryOperators.length > 0 && !countryOperators.includes(num.operatorName));
     setShowForm(true);
   };
 
@@ -119,7 +124,21 @@ export default function AdminPaymentNumbers() {
     setForm(emptyForm);
     setManualCountry(false);
     setManualCountryInput("");
+    setCustomOperator(false);
   };
+
+  const getOperatorsForCountry = (countryCode: string) => {
+    const country = countries.find(c => c.code === countryCode);
+    if (!country?.operators) return [];
+    try {
+      const parsed = JSON.parse(country.operators);
+      return Array.isArray(parsed) ? parsed.filter((operator): operator is string => typeof operator === "string" && operator.trim().length > 0) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const operatorOptions = getOperatorsForCountry(form.country);
 
   const grouped = numbers.reduce((acc, n) => {
     if (!acc[n.country]) acc[n.country] = [];
@@ -225,7 +244,8 @@ export default function AdminPaymentNumbers() {
                         setManualCountry(true);
                         setForm(f => ({ ...f, country: "" }));
                       } else {
-                        setForm(f => ({ ...f, country: e.target.value }));
+                        setForm(f => ({ ...f, country: e.target.value, operatorName: "" }));
+                        setCustomOperator(false);
                       }
                     }}
                     className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground"
@@ -262,8 +282,35 @@ export default function AdminPaymentNumbers() {
             </div>
             <div>
               <label className="text-sm font-medium">Opérateur</label>
-              <Input value={form.operatorName} onChange={(e) => setForm(f => ({ ...f, operatorName: e.target.value }))}
-                placeholder="Ex: Airtel Money, Moov Money" className="mt-1" data-testid="input-operator-name" />
+              {operatorOptions.length > 0 && !customOperator ? (
+                <select
+                  value={form.operatorName}
+                  onChange={(e) => {
+                    if (e.target.value === "__custom__") {
+                      setCustomOperator(true);
+                      setForm(f => ({ ...f, operatorName: "" }));
+                    } else {
+                      setForm(f => ({ ...f, operatorName: e.target.value }));
+                    }
+                  }}
+                  className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground mt-1"
+                  data-testid="select-operator"
+                >
+                  <option value="">-- Choisir un opérateur --</option>
+                  {operatorOptions.map(operator => <option key={operator} value={operator}>{operator}</option>)}
+                  <option value="__custom__">✏️ Saisir un autre opérateur...</option>
+                </select>
+              ) : (
+                <div className="flex gap-2 mt-1">
+                  <Input value={form.operatorName} onChange={(e) => setForm(f => ({ ...f, operatorName: e.target.value }))}
+                    placeholder="Ex: Airtel Money, Moov Money" className="flex-1" data-testid="input-operator-name" />
+                  {operatorOptions.length > 0 && (
+                    <Button type="button" variant="outline" size="sm" onClick={() => { setCustomOperator(false); setForm(f => ({ ...f, operatorName: "" })); }}>
+                      Liste
+                    </Button>
+                  )}
+                </div>
+              )}
             </div>
             <div>
               <label className="text-sm font-medium">Numéro de téléphone</label>

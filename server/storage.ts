@@ -117,6 +117,7 @@ export interface IStorage {
 
   // Payment Numbers
   getPaymentNumbers(): Promise<PaymentNumber[]>;
+  getPaymentNumber(id: number): Promise<PaymentNumber | undefined>;
   getPaymentNumbersByCountry(country: string): Promise<PaymentNumber[]>;
   createPaymentNumber(data: Partial<PaymentNumber>): Promise<PaymentNumber>;
   updatePaymentNumber(id: number, data: Partial<PaymentNumber>): Promise<PaymentNumber>;
@@ -1250,6 +1251,11 @@ export class DatabaseStorage implements IStorage {
   // Payment Numbers
   async getPaymentNumbers(): Promise<PaymentNumber[]> {
     return await db.select().from(paymentNumbers).orderBy(desc(paymentNumbers.createdAt));
+  }
+
+  async getPaymentNumber(id: number): Promise<PaymentNumber | undefined> {
+    const [num] = await db.select().from(paymentNumbers).where(eq(paymentNumbers.id, id));
+    return num || undefined;
   }
 
   async getPaymentNumbersByCountry(country: string): Promise<PaymentNumber[]> {

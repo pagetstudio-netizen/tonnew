@@ -777,7 +777,7 @@ export async function registerRoutes(
   // Payment Numbers (public — filtered by country)
   app.get("/api/payment-numbers", requireAuth, async (req, res) => {
     try {
-      const country = req.query.country as string;
+      const country = typeof req.query.country === "string" ? req.query.country.trim().toUpperCase() : "";
       if (country) {
         const nums = await storage.getPaymentNumbersByCountry(country);
         return res.json(nums);
@@ -883,6 +883,25 @@ export async function registerRoutes(
          }
        }
        const normalizedDeposit = parsedDeposit.data;
+       const hasManualPaymentNumber = paymentNumberId !== undefined && paymentNumberId !== null;
+       let selectedPaymentNumber: Awaited<ReturnType<typeof storage.getPaymentNumber>> | undefined;
+       if (hasManualPaymentNumber) {
+         const parsedPaymentNumberId = Number(paymentNumberId);
+         if (!Number.isInteger(parsedPaymentNumberId) || parsedPaymentNumberId <= 0) {
+           return res.status(400).json({ message: "Numéro de paiement invalide" });
+         }
+         selectedPaymentNumber = await storage.getPaymentNumber(parsedPaymentNumberId);
+         if (
+           !selectedPaymentNumber ||
+           !selectedPaymentNumber.isActive ||
+           selectedPaymentNumber.country.toUpperCase() !== normalizedDeposit.country.toUpperCase()
+         ) {
+           return res.status(400).json({ message: "Ce numéro de paiement n'est plus disponible pour ce pays" });
+         }
+         if (!screenshot) {
+           return res.status(400).json({ message: "La capture d'écran du paiement est requise" });
+         }
+       }
 
       const soleaspayEnabled = settings.soleaspayEnabled !== "false";
       const soleaspayCountries = settings.soleaspayCountries ? settings.soleaspayCountries.split(",").filter(Boolean) : [];
@@ -981,10 +1000,12 @@ export async function registerRoutes(
          accountName: normalizedDeposit.accountName,
          accountNumber: normalizedDeposit.accountNumber,
          country: normalizedDeposit.country,
-         paymentMethod: normalizedDeposit.paymentMethod,
+         paymentMethod: selectedPaymentNumber?.operatorName || normalizedDeposit.paymentMethod,
          paymentChannelId: normalizedDeposit.paymentChannelId && normalizedDeposit.paymentChannelId > 0 ? normalizedDeposit.paymentChannelId : null,
-        paymentNumberId: paymentNumberId || null,
-        channelName: channelName || null,
+         paymentNumberId: selectedPaymentNumber?.id || null,
+         channelName: selectedPaymentNumber
+           ? `${selectedPaymentNumber.operatorName} - ${selectedPaymentNumber.phone}`
+           : channelName || null,
         screenshot: screenshot || null,
         paymentMessage: paymentMessage || null,
         reference: reference || null,
@@ -2606,14 +2627,18 @@ export async function registerRoutes(
         (value || "").split(",").map(code => code.trim().toUpperCase()).filter(Boolean);
       const ashtechCountries = enabledCodes(settings.ashtechCountries);
       const westpayCountries = enabledCodes(settings.westpayCountries);
+      const providers: Array<{ provider: "ashtech" | "westpay" | "sendavapay"; name: string }> = [];
       if (settings.ashtechEnabled === "true" && ashtechCountries.includes(country)) {
-        return res.json({ provider: "ashtech", name: settings.ashtechChannelName || "AshtechPay" });
+        providers.push({ provider: "ashtech", name: settings.ashtechChannelName || "AshtechPay" });
       }
       if (settings.westpayEnabled === "true" && westpayCountries.includes(country)) {
-        return res.json({ provider: "westpay", name: settings.westpayChannelName || "WestPay" });
+        providers.push({ provider: "westpay", name: settings.westpayChannelName || "WestPay" });
       }
       if (settings.sendavapayEnabled === "true") {
-        return res.json({ provider: "sendavapay", name: settings.sendavapayChannelName || "SendavaPay" });
+        providers.push({ provider: "sendavapay", name: settings.sendavapayChannelName || "SendavaPay" });
+      }
+      if (providers.length > 0) {
+        return res.json({ ...providers[0], providers });
       }
       return res.status(503).json({ message: "Aucun canal de paiement disponible", provider: "sendavapay", name: "SendavaPay" });
     } catch (error: any) {
