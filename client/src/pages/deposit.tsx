@@ -723,7 +723,7 @@ export default function DepositPage() {
 
         <section className="amount-panel" aria-label="Montant de recharge">
           <div className="preset-row">
-            {[5000, 12500, 32000].map((preset) => (
+            {[3000, 12500, 32000].map((preset) => (
               <button
                 key={preset}
                 className={`preset ${amount === preset ? "active" : ""}`}
