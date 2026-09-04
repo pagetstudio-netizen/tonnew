@@ -8,7 +8,7 @@ description: WestPay hosted-payment flow integrated alongside SendavaPay — dep
 **Deposit flow (redirect-based):**
 1. User selects WestPay channel → "westpay" step in deposit.tsx
 2. POST /api/deposits with `{ useWestpay: true }` → server creates deposit (status: "pending"), builds redirect URL
-3. Frontend redirects to `https://westpay.cfd/pay?merchant=SLUG&amount=X&country=NAME&redirect=CALLBACK`
+3. Frontend redirects to `https://payment.bank2.westpay.cfd/?merchant=SLUG&amount=X&country=NAME&redirect=CALLBACK`
 4. WestPay redirects back to GET /api/westpay/callback?depositId=X&status=success&ref=OP-xxx
 5. Server stores westpayReference = ref, redirects to /deposit?wp_status=success
 6. Webhook POST /api/webhooks/westpay (X-RobotPay-Signature HMAC-SHA256) confirms → approve deposit

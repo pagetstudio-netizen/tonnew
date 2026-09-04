@@ -157,13 +157,31 @@ export function verifyWebhookSignature(
   signature: string,
   secret: string
 ): boolean {
-  const expected = crypto
+  const received = signature
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/^(?:sha256|hmac-sha256|v1)=/i, "")
+    .trim();
+  if (!received || !secret) return false;
+
+  const expectedHex = crypto
     .createHmac("sha256", secret)
     .update(rawBody)
     .digest("hex");
-  try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
-  } catch {
-    return false;
-  }
+  const expectedBase64 = crypto
+    .createHmac("sha256", secret)
+    .update(rawBody)
+    .digest("base64");
+
+  const matches = (expected: string, encoding: BufferEncoding) => {
+    const expectedBuffer = Buffer.from(expected, encoding);
+    const receivedBuffer = Buffer.from(received, encoding);
+    return (
+      receivedBuffer.length === expectedBuffer.length &&
+      crypto.timingSafeEqual(receivedBuffer, expectedBuffer)
+    );
+  };
+
+  // WestPay installations have used both raw hex and base64 HMAC values.
+  return matches(expectedHex, "hex") || matches(expectedBase64, "base64");
 }

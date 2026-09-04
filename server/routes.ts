@@ -1628,11 +1628,13 @@ export async function registerRoutes(
           return res.status(401).json({ message: "Signature invalide" });
         }
         const payload = req.body;
-        const { event, txId } = payload;
-        if (!txId) return res.json({ received: true });
-        const deposit = await storage.getDepositByWestpayReference(txId);
+        const { event, txId, status } = payload;
+        const transactionReference =
+          txId || payload.transactionId || payload.reference || payload.ref;
+        if (!transactionReference) return res.json({ received: true });
+        const deposit = await storage.getDepositByWestpayReference(transactionReference);
         if (!deposit) {
-          console.warn(`[westpay webhook] Aucun dépôt pour txId: ${txId}`);
+          console.warn(`[westpay webhook] Aucun dépôt pour référence: ${transactionReference}`);
           return res.json({ received: true });
         }
         if (deposit.status === "approved" || deposit.status === "rejected") {
