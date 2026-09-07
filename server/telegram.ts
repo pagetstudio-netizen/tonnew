@@ -133,6 +133,28 @@ export async function sendTelegramSecurityAlert(ip: string, attemptMessage: stri
   ].join("\n"));
 }
 
+export async function sendTelegramInpayError(params: {
+  operation: string;
+  error: unknown;
+  country?: string;
+  amount?: unknown;
+  reference?: unknown;
+  recordId?: unknown;
+}): Promise<void> {
+  const errorMessage = params.error instanceof Error
+    ? params.error.message
+    : String(params.error || "Erreur inconnue");
+  await sendTelegramMessage([
+    "❌ <b>Erreur InPay</b>",
+    `Opération : ${formatTelegramValue(params.operation)}`,
+    params.recordId !== undefined ? `ID : ${formatTelegramValue(params.recordId)}` : "",
+    params.reference ? `Référence : ${formatTelegramValue(params.reference)}` : "",
+    params.country ? `Pays : ${formatTelegramValue(params.country)}` : "",
+    params.amount !== undefined ? `Montant : <b>${formatTelegramValue(params.amount)} XOF</b>` : "",
+    `Erreur exacte : <code>${formatTelegramValue(errorMessage)}</code>`,
+  ].filter(Boolean).join("\n"));
+}
+
 export function startTelegramBot(): void {
   if (!isTelegramConfigured()) return;
   let updateOffset = 0;

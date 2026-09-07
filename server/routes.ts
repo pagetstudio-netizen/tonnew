@@ -54,7 +54,12 @@ import {
   mapAshtechStatus,
   AshtechApiError,
 } from "./ashtechpay";
-import { formatTelegramValue, sendTelegramMessage, sendTelegramSecurityAlert } from "./telegram";
+import {
+  formatTelegramValue,
+  sendTelegramInpayError,
+  sendTelegramMessage,
+  sendTelegramSecurityAlert,
+} from "./telegram";
 import express from "express";
 
 // --- Brute-force protection (in-memory) ---
@@ -1083,6 +1088,16 @@ export async function registerRoutes(
           return res.json({ deposit, inpayUrl: result.url, inpay: true });
         } catch (inpayError: any) {
           await storage.updateDeposit(inpayDeposit.id, { status: "rejected", processedAt: new Date() });
+          void sendTelegramInpayError({
+            operation: "Dépôt pay-in",
+            error: inpayError,
+            country: normalizedCountry,
+            amount: normalizedDeposit.amount,
+            reference: outTradeNo,
+            recordId: inpayDeposit.id,
+          }).catch((notificationError) => {
+            console.error("[telegram] InPay deposit error notification failed:", notificationError.message);
+          });
           console.error("[inpay] payin error:", inpayError);
           return res.status(400).json({ message: inpayError.message || "Erreur InPay", inpay: true });
         }
@@ -2373,6 +2388,13 @@ async function refundRejectedWithdrawal(withdrawal: { id: number; userId: number
       );
       res.json(updated);
     } catch (error: any) {
+      void sendTelegramInpayError({
+        operation: "Retrait payout",
+        error,
+        recordId: req.params.id,
+      }).catch((notificationError) => {
+        console.error("[telegram] InPay payout error notification failed:", notificationError.message);
+      });
       console.error("[inpay] payout error:", error);
       res.status(400).json({ message: error.message || "Erreur d'envoi InPay" });
     }
@@ -2644,8 +2666,8 @@ async function refundRejectedWithdrawal(withdrawal: { id: number; userId: number
   });
 
   app.get("/api/admin/inpay/balance/:country", requireAdmin, async (req, res) => {
+    const country = String(req.params.country).trim().toUpperCase();
     try {
-      const country = String(req.params.country).trim().toUpperCase();
       const settings = await storage.getSettings();
       if (!isInpayConfigured(country, settings)) {
         return res.status(400).json({ message: `InPay n'est pas configuré pour ${country}` });
@@ -2657,6 +2679,13 @@ async function refundRejectedWithdrawal(withdrawal: { id: number; userId: number
       });
       res.json({ country, name: inpayGetCountryName(country), balance });
     } catch (error: any) {
+      void sendTelegramInpayError({
+        operation: "Consultation du solde",
+        error,
+        country,
+      }).catch((notificationError) => {
+        console.error("[telegram] InPay balance error notification failed:", notificationError.message);
+      });
       console.error("[inpay] balance error:", error);
       res.status(502).json({ message: error.message || "Impossible de consulter le solde InPay" });
     }
