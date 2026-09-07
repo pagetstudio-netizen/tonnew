@@ -1,4 +1,9 @@
 import crypto from "crypto";
+import { setDefaultResultOrder } from "node:dns";
+
+// InPay whitelists the server's public IP. Prefer the authorized IPv4 route
+// when the hosting provider also exposes an IPv6 egress address.
+setDefaultResultOrder("ipv4first");
 
 export const INPAY_COUNTRY_PREFIXES: Record<string, string> = {
   SN: "221",
