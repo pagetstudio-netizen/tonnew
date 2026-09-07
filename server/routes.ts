@@ -1118,6 +1118,9 @@ export async function registerRoutes(
             amount: normalizedDeposit.amount,
             reference: outTradeNo,
             recordId: inpayDeposit.id,
+            orderNumber: outTradeNo,
+            requestUrl: inpayError?.requestUrl,
+            requestData: inpayError?.requestData,
           }).catch((notificationError) => {
             console.error("[telegram] InPay deposit error notification failed:", notificationError.message);
           });

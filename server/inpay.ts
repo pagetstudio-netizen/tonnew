@@ -65,6 +65,18 @@ export interface InpayPayoutResult {
   message?: string;
 }
 
+export class InpayRequestError extends Error {
+  requestUrl: string;
+  requestData: Record<string, unknown>;
+
+  constructor(message: string, requestUrl: string, requestData: Record<string, unknown>) {
+    super(message);
+    this.name = "InpayRequestError";
+    this.requestUrl = requestUrl;
+    this.requestData = requestData;
+  }
+}
+
 export function getInpayApiBase(): string {
   return (process.env.INPAY_API_BASE_URL || "").replace(/\/+$/, "");
 }
@@ -151,11 +163,21 @@ function formBody(params: Record<string, unknown>): string {
   ).toString();
 }
 
+function safeRequestData(params: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(params).map(([key, value]) => [
+      key,
+      key === "sign" ? "[redacted]" : value,
+    ]),
+  );
+}
+
 async function postInpay<T>(
   path: string,
   params: Record<string, unknown>,
 ): Promise<InpayApiResult<T>> {
   const endpoint = `${getInpayApiBase()}${path}`;
+  const requestData = safeRequestData(params);
   const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -175,8 +197,10 @@ async function postInpay<T>(
         .replace(/\s+/g, " ")
         .trim()
         .slice(0, 300);
-      throw new Error(
+      throw new InpayRequestError(
         `L'API InPay a renvoyé une page HTML (HTTP ${response.status}) sur ${endpoint}${detail ? ` : ${detail}` : ""}`,
+        endpoint,
+        requestData,
       );
     }
     const detail = body
@@ -184,14 +208,18 @@ async function postInpay<T>(
       .replace(/\s+/g, " ")
       .trim()
       .slice(0, 240);
-    throw new Error(
+    throw new InpayRequestError(
       `Réponse InPay invalide (HTTP ${response.status})${detail ? ` : ${detail}` : ""}`,
+      endpoint,
+      requestData,
     );
   }
   if (!response.ok) {
-    throw new Error(
+    throw new InpayRequestError(
       data.message ||
       `Erreur InPay HTTP ${response.status}${data.errno !== undefined ? ` (errno ${data.errno})` : ""}`,
+      endpoint,
+      requestData,
     );
   }
   return data;

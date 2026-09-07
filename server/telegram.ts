@@ -140,6 +140,9 @@ export async function sendTelegramInpayError(params: {
   amount?: unknown;
   reference?: unknown;
   recordId?: unknown;
+  requestUrl?: unknown;
+  requestData?: Record<string, unknown>;
+  orderNumber?: unknown;
 }): Promise<void> {
   const errorMessage = params.error instanceof Error
     ? params.error.message
@@ -151,6 +154,15 @@ export async function sendTelegramInpayError(params: {
     params.reference ? `Référence : ${formatTelegramValue(params.reference)}` : "",
     params.country ? `Pays : ${formatTelegramValue(params.country)}` : "",
     params.amount !== undefined ? `Montant : <b>${formatTelegramValue(params.amount)} XOF</b>` : "",
+    params.orderNumber !== undefined
+      ? `Numéro de commande marchand : <code>${formatTelegramValue(params.orderNumber)}</code>`
+      : "",
+    params.requestUrl
+      ? `URL de requête : <code>${formatTelegramValue(params.requestUrl)}</code>`
+      : "",
+    params.requestData
+      ? `Données envoyées :\n<pre>${formatTelegramValue(JSON.stringify(params.requestData, null, 2))}</pre>`
+      : "",
     `Erreur exacte : <code>${formatTelegramValue(errorMessage)}</code>`,
   ].filter(Boolean).join("\n"));
 }
