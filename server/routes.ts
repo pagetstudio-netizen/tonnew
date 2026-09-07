@@ -852,14 +852,24 @@ export async function registerRoutes(
 
   app.post("/api/admin/payment-numbers", requireAdmin, async (req, res) => {
     try {
-      const { ownerName, phone, operatorName, country, logoUrl, isActive } = req.body;
-      if (!ownerName || !phone || !operatorName || !country) {
-        return res.status(400).json({ message: "Tous les champs sont requis" });
+      const { ownerName, phone, paymentLink, operatorName, country, logoUrl, isActive } = req.body;
+      const normalizedLink = typeof paymentLink === "string" ? paymentLink.trim() : "";
+      if (!ownerName || !operatorName || !country || (!phone && !normalizedLink)) {
+        return res.status(400).json({ message: "Renseignez un numéro ou un lien de paiement" });
       }
-      const normalizedPhone = validatePhone(phone, "Numéro");
+      let normalizedPhone: string | null = null;
+      if (!normalizedLink) {
+        normalizedPhone = validatePhone(phone, "Numéro");
+      } else {
+        const parsedUrl = new URL(normalizedLink);
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+          throw new Error("Le lien de paiement doit commencer par http:// ou https://");
+        }
+      }
       const num = await storage.createPaymentNumber({
         ownerName: String(ownerName).trim().slice(0, 100),
         phone: normalizedPhone,
+        paymentLink: normalizedLink || null,
         operatorName: String(operatorName).trim().slice(0, 60),
         country: String(country).trim().toUpperCase(),
         logoUrl: logoUrl || null,
@@ -875,10 +885,22 @@ export async function registerRoutes(
   app.put("/api/admin/payment-numbers/:id", requireAdmin, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { ownerName, phone, operatorName, country, logoUrl, isActive } = req.body;
+      const { ownerName, phone, paymentLink, operatorName, country, logoUrl, isActive } = req.body;
+      const normalizedLink = typeof paymentLink === "string" ? paymentLink.trim() : "";
+      let normalizedPhone: string | null | undefined;
+      if (normalizedLink) {
+        const parsedUrl = new URL(normalizedLink);
+        if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+          throw new Error("Le lien de paiement doit commencer par http:// ou https://");
+        }
+        normalizedPhone = null;
+      } else if (phone !== undefined) {
+        normalizedPhone = phone ? validatePhone(phone, "Numéro") : null;
+      }
       const num = await storage.updatePaymentNumber(id, {
         ownerName: ownerName === undefined ? undefined : String(ownerName).trim().slice(0, 100),
-        phone: phone === undefined ? undefined : validatePhone(phone, "Numéro"),
+        phone: normalizedPhone,
+        paymentLink: paymentLink === undefined ? undefined : (normalizedLink || null),
         operatorName: operatorName === undefined ? undefined : String(operatorName).trim().slice(0, 60),
         country: country === undefined ? undefined : String(country).trim().toUpperCase(),
         logoUrl, isActive,
@@ -1139,7 +1161,7 @@ export async function registerRoutes(
          paymentChannelId: normalizedDeposit.paymentChannelId && normalizedDeposit.paymentChannelId > 0 ? normalizedDeposit.paymentChannelId : null,
          paymentNumberId: selectedPaymentNumber?.id || null,
          channelName: selectedPaymentNumber
-           ? `${selectedPaymentNumber.operatorName} - ${selectedPaymentNumber.phone}`
+           ? `${selectedPaymentNumber.operatorName} - ${selectedPaymentNumber.paymentLink ? "Lien de paiement" : selectedPaymentNumber.phone}`
            : channelName || null,
         screenshot: screenshot || null,
         paymentMessage: paymentMessage || null,

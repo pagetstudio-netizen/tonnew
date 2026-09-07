@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Check, ChevronRight, ClipboardCheck, Copy, ImageIcon, Loader2, Phone, ShieldCheck } from "lucide-react";
+import { Check, ChevronRight, ClipboardCheck, Copy, ExternalLink, ImageIcon, Loader2, Phone, ShieldCheck } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
@@ -226,7 +226,7 @@ export default function RobotPayPage() {
         paymentMethod: number.operatorName,
         country,
         paymentNumberId: number.id,
-        channelName: `${number.operatorName} - ${number.phone}`,
+         channelName: number.paymentLink ? `${number.operatorName} - Lien de paiement` : `${number.operatorName} - ${number.phone}`,
         screenshot,
         paymentMessage: paymentMessage.trim() || null,
       });
@@ -279,10 +279,11 @@ export default function RobotPayPage() {
     const number = operator?.manualNumber;
     if (!number) return;
     try {
-      await navigator.clipboard.writeText(number.phone);
-      toast({ title: "Numéro copié", description: number.phone });
+       const value = number.paymentLink || number.phone || "";
+       await navigator.clipboard.writeText(value);
+       toast({ title: number.paymentLink ? "Lien copié" : "Numéro copié", description: value });
     } catch {
-      toast({ title: number.phone, description: "Copiez ce numéro manuellement" });
+       toast({ title: number.paymentLink || number.phone || "", description: number.paymentLink ? "Ouvrez le lien pour payer" : "Copiez ce numéro manuellement" });
     }
   };
 
@@ -321,8 +322,8 @@ export default function RobotPayPage() {
           {step === 0 && (
             <div className="space-y-5">
               <p className="px-1 text-xl text-white">Sélectionnez le mode de paiement :</p>
-              {loadingOperators ? <Loader2 className="w-7 h-7 animate-spin mx-auto text-blue-500" /> : operators.length === 0 ? <p className="text-center text-gray-500">Aucun opérateur disponible pour ce pays.</p> : (
-                <div className="space-y-3">{operators.map((op, i) => <button key={`${op.id || op.name}-${i}`} onClick={() => chooseOperator(op)} className={`w-full flex items-center justify-between rounded-lg px-4 py-4 border-2 text-left ${operator === op ? "border-[#2885d8] bg-blue-50" : "border-gray-100 bg-white shadow-sm"}`}><span><span className="block font-semibold text-lg text-[#14538a]">{op.name || op.code}</span><span className="block text-xs text-gray-500">{op.manualNumber ? "Paiement par numéro" : "Paiement automatique"}</span></span><ChevronRight className="text-gray-400" /></button>)}</div>
+               {loadingOperators ? <Loader2 className="w-7 h-7 animate-spin mx-auto text-blue-500" /> : operators.length === 0 ? <p className="text-center text-gray-500">Aucun opérateur disponible pour ce pays.</p> : (
+                 <div className="space-y-3">{operators.map((op, i) => <button key={`${op.id || op.name}-${i}`} onClick={() => chooseOperator(op)} className={`w-full flex items-center justify-between rounded-lg px-4 py-4 border-2 text-left ${operator === op ? "border-[#2885d8] bg-blue-50" : "border-gray-100 bg-white shadow-sm"}`}><span><span className="block font-semibold text-lg text-[#14538a]">{op.name || op.code}</span><span className="block text-xs text-gray-500">{op.manualNumber ? (op.manualNumber.paymentLink ? "Paiement par lien" : "Paiement par numéro") : "Paiement automatique"}</span></span><ChevronRight className="text-gray-400" /></button>)}</div>
               )}
             </div>
           )}
@@ -331,15 +332,30 @@ export default function RobotPayPage() {
               <div className="bg-[#ffe0a0] px-3 py-2 text-sm leading-tight text-[#e65b28]">Veuillez sélectionner la même option que votre méthode de transfert.</div>
               {operator?.manualNumber && (
                 <div className="rounded-lg border border-green-200 bg-green-50 p-4 text-left">
-                  <p className="text-xs text-gray-500">Numéro de paiement</p>
-                  <div className="mt-1 flex items-center gap-2">
-                    {operator.manualNumber.logoUrl && <img src={operator.manualNumber.logoUrl} alt="" className="h-9 w-9 rounded object-contain" />}
-                    <p className="flex-1 font-mono text-lg font-bold text-[#008f20]">{operator.manualNumber.phone}</p>
-                    <button onClick={copyPaymentNumber} className="flex shrink-0 items-center gap-1 rounded-md bg-[#00CC2C] px-3 py-2 text-sm font-semibold text-white">
-                      <Copy className="h-4 w-4" /> Copier
-                    </button>
-                  </div>
-                  <p className="mt-2 text-xs text-gray-600">Effectuez le paiement sur ce numéro, puis envoyez la preuve ci-dessous.</p>
+                   {operator.manualNumber.paymentLink ? (
+                     <>
+                       <p className="text-xs text-gray-500">Lien de paiement</p>
+                       <a href={operator.manualNumber.paymentLink} target="_blank" rel="noreferrer" className="mt-2 flex items-center justify-center gap-2 rounded-md bg-[#00CC2C] px-3 py-3 text-sm font-semibold text-white">
+                         <ExternalLink className="h-4 w-4" /> Ouvrir le lien de paiement
+                       </a>
+                       <button onClick={copyPaymentNumber} className="mt-2 flex w-full items-center justify-center gap-1 rounded-md border border-[#00CC2C] px-3 py-2 text-sm font-semibold text-[#008f20]">
+                         <Copy className="h-4 w-4" /> Copier le lien
+                       </button>
+                       <p className="mt-2 text-xs text-gray-600">Effectuez le paiement via ce lien, puis envoyez la preuve ci-dessous.</p>
+                     </>
+                   ) : (
+                     <>
+                       <p className="text-xs text-gray-500">Numéro de paiement</p>
+                       <div className="mt-1 flex items-center gap-2">
+                         {operator.manualNumber.logoUrl && <img src={operator.manualNumber.logoUrl} alt="" className="h-9 w-9 rounded object-contain" />}
+                         <p className="flex-1 font-mono text-lg font-bold text-[#008f20]">{operator.manualNumber.phone}</p>
+                         <button onClick={copyPaymentNumber} className="flex shrink-0 items-center gap-1 rounded-md bg-[#00CC2C] px-3 py-2 text-sm font-semibold text-white">
+                           <Copy className="h-4 w-4" /> Copier
+                         </button>
+                       </div>
+                       <p className="mt-2 text-xs text-gray-600">Effectuez le paiement sur ce numéro, puis envoyez la preuve ci-dessous.</p>
+                     </>
+                   )}
                 </div>
               )}
               <label className="block text-sm font-semibold">Veuillez entrer votre numéro de téléphone:</label>

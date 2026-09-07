@@ -18,6 +18,12 @@ export async function seed() {
   await db.execute(sql`
     CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire")
   `);
+  await db.execute(sql`
+    ALTER TABLE "payment_numbers" ALTER COLUMN "phone" DROP NOT NULL
+  `).catch(() => undefined);
+  await db.execute(sql`
+    ALTER TABLE "payment_numbers" ADD COLUMN IF NOT EXISTS "payment_link" text
+  `).catch(() => undefined);
 
   // Ensure countries table exists
   await db.execute(sql`

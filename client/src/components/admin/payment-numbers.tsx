@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Plus, Edit, Trash2, Phone, Loader2, Eye, EyeOff } from "lucide-react";
+import { Plus, Edit, Trash2, Phone, Loader2, Eye, EyeOff, ExternalLink } from "lucide-react";
 import type { PaymentNumber } from "@shared/schema";
 
 interface Country {
@@ -26,7 +26,7 @@ const COUNTRY_FLAGS: Record<string, string> = {
   TD: "🇹🇩", NE: "🇳🇪", CD: "🇨🇩", CF: "🇨🇫",
 };
 
-const emptyForm = { ownerName: "", phone: "", operatorName: "", country: "", logoUrl: "", isActive: true };
+const emptyForm = { ownerName: "", phone: "", paymentLink: "", paymentType: "phone" as "phone" | "link", operatorName: "", country: "", logoUrl: "", isActive: true };
 
 export default function AdminPaymentNumbers() {
   const { toast } = useToast();
@@ -49,6 +49,8 @@ export default function AdminPaymentNumbers() {
     mutationFn: async () => {
       const payload = {
         ...form,
+        phone: form.paymentType === "phone" ? form.phone : "",
+        paymentLink: form.paymentType === "link" ? form.paymentLink.trim() : "",
         country: manualCountry ? manualCountryInput.toUpperCase().trim() : form.country,
       };
       if (!payload.country) throw new Error("Veuillez sélectionner ou saisir un pays");
@@ -113,7 +115,16 @@ export default function AdminPaymentNumbers() {
     const countryOperators = getOperatorsForCountry(num.country);
     setManualCountry(!isKnown);
     setManualCountryInput(!isKnown ? num.country : "");
-    setForm({ ownerName: num.ownerName, phone: num.phone, operatorName: num.operatorName, country: isKnown ? num.country : "", logoUrl: num.logoUrl || "", isActive: num.isActive });
+    setForm({
+      ownerName: num.ownerName,
+      phone: num.phone || "",
+      paymentLink: num.paymentLink || "",
+      paymentType: num.paymentLink ? "link" : "phone",
+      operatorName: num.operatorName,
+      country: isKnown ? num.country : "",
+      logoUrl: num.logoUrl || "",
+      isActive: num.isActive,
+    });
     setCustomOperator(isKnown && countryOperators.length > 0 && !countryOperators.includes(num.operatorName));
     setShowForm(true);
   };
@@ -198,7 +209,13 @@ export default function AdminPaymentNumbers() {
                             {num.isActive ? "Actif" : "Inactif"}
                           </Badge>
                         </div>
-                        <p className="font-mono text-primary font-bold">{num.phone}</p>
+                        {num.paymentLink ? (
+                          <a href={num.paymentLink} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-sm font-semibold text-primary hover:underline">
+                            <ExternalLink className="w-3.5 h-3.5" /> Lien de paiement
+                          </a>
+                        ) : (
+                          <p className="font-mono text-primary font-bold">{num.phone}</p>
+                        )}
                         <p className="text-sm text-muted-foreground">{num.ownerName}</p>
                       </div>
                       <div className="flex gap-1">
@@ -313,9 +330,30 @@ export default function AdminPaymentNumbers() {
               )}
             </div>
             <div>
+              <label className="text-sm font-medium">Mode de paiement</label>
+              <select
+                value={form.paymentType}
+                onChange={(e) => setForm(f => ({ ...f, paymentType: e.target.value as "phone" | "link" }))}
+                className="w-full border border-border rounded-lg px-3 py-2 text-sm bg-background text-foreground mt-1"
+                data-testid="select-payment-type"
+              >
+                <option value="phone">Numéro Mobile Money</option>
+                <option value="link">Lien de paiement</option>
+              </select>
+            </div>
+            <div>
+              {form.paymentType === "phone" ? (
               <label className="text-sm font-medium">Numéro de téléphone</label>
-              <Input value={form.phone} onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))}
-                placeholder="Ex: +23599000000" className="mt-1" data-testid="input-phone" />
+              ) : (
+                <label className="text-sm font-medium">Lien de paiement</label>
+              )}
+              {form.paymentType === "phone" ? (
+                <Input value={form.phone} onChange={(e) => setForm(f => ({ ...f, phone: e.target.value }))}
+                  placeholder="Ex: +23599000000" className="mt-1" data-testid="input-phone" />
+              ) : (
+                <Input value={form.paymentLink} onChange={(e) => setForm(f => ({ ...f, paymentLink: e.target.value }))}
+                  placeholder="https://..." type="url" className="mt-1" data-testid="input-payment-link" />
+              )}
             </div>
             <div>
               <label className="text-sm font-medium">Nom du propriétaire</label>
@@ -339,7 +377,7 @@ export default function AdminPaymentNumbers() {
               <Button
                 className="flex-1"
                 onClick={() => saveMutation.mutate()}
-                disabled={saveMutation.isPending || !form.ownerName || !form.phone || !form.operatorName || (!manualCountry && !form.country) || (manualCountry && !manualCountryInput.trim())}
+                disabled={saveMutation.isPending || !form.ownerName || !form.operatorName || (form.paymentType === "phone" ? !form.phone : !form.paymentLink) || (!manualCountry && !form.country) || (manualCountry && !manualCountryInput.trim())}
                 data-testid="button-save-payment-number"
               >
                 {saveMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : (editTarget ? "Modifier" : "Ajouter")}

@@ -186,7 +186,8 @@ export type InsertUserStaking = typeof userStakings.$inferInsert;
 export const paymentNumbers = pgTable("payment_numbers", {
   id: serial("id").primaryKey(),
   ownerName: text("owner_name").notNull(),
-  phone: text("phone").notNull(),
+  phone: text("phone"),
+  paymentLink: text("payment_link"),
   operatorName: text("operator_name").notNull(),
   country: text("country").notNull(),
   logoUrl: text("logo_url"),
