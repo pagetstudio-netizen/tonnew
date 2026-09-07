@@ -901,7 +901,7 @@ export async function registerRoutes(
   // Deposits
   app.post("/api/deposits", requireAuth, async (req, res) => {
     try {
-      const { amount, accountName, accountNumber, paymentMethod, country, paymentChannelId, useSoleaspay, useWestpay, useInpay, otpCode,
+      const { amount, accountName, accountNumber, paymentMethod, country, paymentChannelId, useSoleaspay, useWestpay, useInpay, inpayPhone, otpCode,
         paymentNumberId, channelName, screenshot, paymentMessage, reference } = req.body;
       const user = await storage.getUser(req.session.userId!);
       
@@ -1067,12 +1067,20 @@ export async function registerRoutes(
             inpay: true,
           });
         }
+        const parsedInpayPhone = phoneNumberSchema.safeParse(inpayPhone);
+        if (!parsedInpayPhone.success) {
+          return res.status(400).json({
+            message: `Le numéro Mobile Money de ${normalizedCountry} est requis et doit être valide`,
+            inpay: true,
+          });
+        }
+        const inpayCustomerMobile = parsedInpayPhone.data;
 
         const inpayDeposit = await storage.createDeposit({
           userId: req.session.userId!,
           amount: normalizedDeposit.amount,
           accountName: normalizedDeposit.accountName || user.fullName,
-          accountNumber: normalizedDeposit.accountNumber || user.phone,
+          accountNumber: inpayCustomerMobile,
           country: normalizedCountry,
           paymentMethod: "InPay",
           paymentChannelId: normalizedDeposit.paymentChannelId && normalizedDeposit.paymentChannelId > 0 ? normalizedDeposit.paymentChannelId : null,
@@ -1087,7 +1095,7 @@ export async function registerRoutes(
             merchantId: account.merchantId,
             apiKey: account.apiKey,
             customerName: normalizedDeposit.accountName || user.fullName,
-            customerMobile: normalizedDeposit.accountNumber || user.phone,
+            customerMobile: inpayCustomerMobile,
             customerEmail: `user${user.id}@tonnew.app`,
             notificationUrl: `${getPublicBaseUrl(req)}/api/webhooks/inpay`,
             outTradeNo,
