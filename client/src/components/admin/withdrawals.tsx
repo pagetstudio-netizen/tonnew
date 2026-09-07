@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Check, X, Search, Loader2 } from "lucide-react";
+import { Check, X, Search, Loader2, Send } from "lucide-react";
 import type { Withdrawal } from "@shared/schema";
 
 interface WithdrawalWithUser extends Withdrawal {
@@ -23,7 +23,7 @@ interface WithdrawalWithUser extends Withdrawal {
 export default function AdminWithdrawals() {
   const { toast } = useToast();
   const [filter, setFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "approved" | "rejected">("pending");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "processing" | "approved" | "rejected">("pending");
 
   const { data: allWithdrawals, isLoading } = useQuery<WithdrawalWithUser[]>({
     queryKey: ["/api/admin/withdrawals"],
@@ -64,6 +64,28 @@ export default function AdminWithdrawals() {
     onSettled: () => setProcessingId(null),
   });
 
+  const inpayMutation = useMutation({
+    mutationFn: async (id: number) => {
+      setProcessingId(id);
+      const res = await fetch(`/api/admin/withdrawals/${id}/inpay`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `Erreur ${res.status}`);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      toast({ title: "Retrait envoyé à InPay" });
+    },
+    onError: (error: any) => {
+      toast({ title: "Erreur InPay", description: error.message, variant: "destructive" });
+    },
+    onSettled: () => setProcessingId(null),
+  });
+
   const filteredWithdrawals = withdrawals?.filter(w =>
     w.accountNumber.includes(filter) ||
     w.user.phone.includes(filter) ||
@@ -85,14 +107,22 @@ export default function AdminWithdrawals() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto">
-        {(["all", "pending", "approved", "rejected"] as const).map((status) => (
+        {(["all", "pending", "processing", "approved", "rejected"] as const).map((status) => (
           <Button
             key={status}
             size="sm"
             variant={statusFilter === status ? "default" : "outline"}
             onClick={() => setStatusFilter(status)}
           >
-            {status === "all" ? "Tous" : status === "pending" ? "En attente" : status === "approved" ? "Approuvés" : "Rejetés"}
+            {status === "all"
+              ? "Tous"
+              : status === "pending"
+                ? "En attente"
+                : status === "processing"
+                  ? "En traitement"
+                  : status === "approved"
+                    ? "Approuvés"
+                    : "Rejetés"}
           </Button>
         ))}
       </div>
@@ -115,9 +145,16 @@ export default function AdminWithdrawals() {
                   </div>
                   <Badge variant={
                     withdrawal.status === "pending" ? "secondary" :
+                    withdrawal.status === "processing" ? "outline" :
                     withdrawal.status === "approved" ? "default" : "destructive"
                   }>
-                    {withdrawal.status === "pending" ? "En attente" : withdrawal.status === "approved" ? "Approuvé" : "Rejeté"}
+                    {withdrawal.status === "pending"
+                      ? "En attente"
+                      : withdrawal.status === "processing"
+                        ? "En traitement"
+                        : withdrawal.status === "approved"
+                          ? "Approuvé"
+                          : "Rejeté"}
                   </Badge>
                 </div>
 
@@ -159,6 +196,18 @@ export default function AdminWithdrawals() {
 
                 {withdrawal.status === "pending" && (
                   <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      onClick={() => inpayMutation.mutate(withdrawal.id)}
+                      disabled={processingId === withdrawal.id}
+                      data-testid={`button-send-inpay-${withdrawal.id}`}
+                    >
+                      {processingId === withdrawal.id
+                        ? <Loader2 className="w-4 h-4 animate-spin" />
+                        : <><Send className="w-4 h-4 mr-1" /> Envoyer à InPay</>}
+                    </Button>
                     <Button
                       size="sm"
                       className="flex-1"

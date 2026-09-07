@@ -39,6 +39,7 @@ export interface IStorage {
   createDeposit(data: Partial<Deposit>): Promise<Deposit>;
   getDeposit(id: number): Promise<Deposit | undefined>;
   getDepositBySendavapayReference(reference: string): Promise<Deposit | undefined>;
+  getDepositByInpayOutTradeNo(reference: string): Promise<Deposit | undefined>;
   getDepositByWestpayReference(reference: string): Promise<Deposit | undefined>;
   getDepositByAshtechReference(reference: string): Promise<Deposit | undefined>;
   getDepositByAshtechTransactionId(transactionId: string): Promise<Deposit | undefined>;
@@ -55,7 +56,9 @@ export interface IStorage {
   createWithdrawal(data: Partial<Withdrawal>): Promise<Withdrawal>;
   getWithdrawals(status?: string): Promise<(Withdrawal & { user: User })[]>;
   getUserWithdrawals(userId: number): Promise<Withdrawal[]>;
+  getWithdrawalByInpayOutTradeNo(reference: string): Promise<Withdrawal | undefined>;
   updateWithdrawal(id: number, data: Partial<Withdrawal>): Promise<Withdrawal>;
+  claimWithdrawalFinalization(id: number, status: "approved" | "rejected"): Promise<Withdrawal | undefined>;
   getUserWithdrawalCountToday(userId: number): Promise<number>;
   
   // Wallets
@@ -526,6 +529,11 @@ export class DatabaseStorage implements IStorage {
     return deposit;
   }
 
+  async getDepositByInpayOutTradeNo(reference: string): Promise<Deposit | undefined> {
+    const [deposit] = await db.select().from(deposits).where(eq(deposits.inpayOutTradeNo, reference));
+    return deposit;
+  }
+
   async getDepositByWestpayReference(reference: string): Promise<Deposit | undefined> {
     const [deposit] = await db.select().from(deposits).where(eq(deposits.westpayReference, reference));
     return deposit;
@@ -699,8 +707,27 @@ export class DatabaseStorage implements IStorage {
     return await db.select().from(withdrawals).where(eq(withdrawals.userId, userId)).orderBy(desc(withdrawals.createdAt));
   }
 
+  async getWithdrawalByInpayOutTradeNo(reference: string): Promise<Withdrawal | undefined> {
+    const [withdrawal] = await db.select().from(withdrawals).where(eq(withdrawals.inpayOutTradeNo, reference));
+    return withdrawal;
+  }
+
   async updateWithdrawal(id: number, data: Partial<Withdrawal>): Promise<Withdrawal> {
     const [withdrawal] = await db.update(withdrawals).set(data).where(eq(withdrawals.id, id)).returning();
+    return withdrawal;
+  }
+
+  async claimWithdrawalFinalization(
+    id: number,
+    status: "approved" | "rejected",
+  ): Promise<Withdrawal | undefined> {
+    const [withdrawal] = await db.update(withdrawals)
+      .set({ status, processedAt: new Date() })
+      .where(and(
+        eq(withdrawals.id, id),
+        sql`${withdrawals.status} NOT IN ('approved', 'rejected')`,
+      ))
+      .returning();
     return withdrawal;
   }
 

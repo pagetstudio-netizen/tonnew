@@ -17,6 +17,7 @@ interface Withdrawal {
 const STATUS_CONFIG: Record<string, { label: string; bg: string; text: string }> = {
   approved: { label: "Succès",     bg: "bg-gray-900",         text: "text-white" },
   pending:  { label: "En attente", bg: "bg-[#55c9e5]",          text: "text-white" },
+  processing: { label: "En traitement", bg: "bg-amber-500", text: "text-white" },
   rejected: { label: "Rejeté",     bg: "bg-red-600",           text: "text-white" },
 };
 

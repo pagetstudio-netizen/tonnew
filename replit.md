@@ -117,8 +117,7 @@ The "Start application" workflow runs `npm run dev` and serves the app on port 5
 - Platform setting `soleaspayEnabled` controls global Soleaspay on/off
 - Platform setting `soleaspayCountries` stores comma-separated country codes (e.g. "TG,BF,CI")
 - Backend enforces Soleaspay for enabled countries (cannot bypass to manual)
-- InPay Africa integration still exists in backend but removed from deposit frontend
-- InPay webhooks and admin balance check still functional for withdrawals
+- InPay Africa supports direct hosted deposits for enabled countries, signed webhooks, admin-triggered payouts, and balance checks
 
 ## Recent Changes (January 2026)
 - Completed full frontend implementation with all pages and modals

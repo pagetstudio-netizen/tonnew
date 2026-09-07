@@ -223,6 +223,9 @@ export async function seed() {
     { key: "ashtechChannelName", value: "AshtechPay" },
     { key: "ashtechCountries", value: "TG,BF,CI" },
     { key: "ashtechWebhookSecret", value: "" },
+    { key: "inpayEnabled", value: "false" },
+    { key: "inpayChannelName", value: "InPay" },
+    { key: "inpayCountries", value: "" },
   ];
 
   for (const settingData of requiredSettings) {

@@ -112,6 +112,13 @@ export default function DepositPage() {
   const westpayAvailable = westpayEnabled && (
     !westpayCountries || westpayCountries.split(",").map(c => c.trim()).includes(country)
   );
+  const inpayEnabled = platformSettings?.inpayEnabled === "true";
+  const inpayChannelName = platformSettings?.inpayChannelName || "InPay";
+  const inpayCountries = platformSettings?.inpayCountries || "";
+  const inpayAvailable = inpayEnabled && inpayCountries
+    .split(",")
+    .map(c => c.trim().toUpperCase())
+    .includes(country.toUpperCase());
   const ashtechEnabled = platformSettings?.ashtechEnabled === "true";
   const ashtechChannelName = platformSettings?.ashtechChannelName || "AshtechPay";
   const ashtechCountriesSetting = platformSettings?.ashtechCountries || "";
@@ -338,6 +345,30 @@ export default function DepositPage() {
     onError: (e: any) => toast({ title: "Erreur WestPay", description: e.message, variant: "destructive" }),
   });
 
+  const inpayInitiateMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/deposits", {
+        amount: Number(amount),
+        accountName: user?.fullName || "",
+        accountNumber: user?.phone || "",
+        paymentMethod: "InPay",
+        country,
+        useInpay: true,
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.message || "Erreur InPay");
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.inpayUrl) {
+        window.location.href = data.inpayUrl;
+      }
+    },
+    onError: (e: any) => toast({ title: `Erreur ${inpayChannelName}`, description: e.message, variant: "destructive" }),
+  });
+
   const ashtechCollectMutation = useMutation({
     mutationFn: async (otp?: string) => {
       if (!ashtechOperator || !ashtechPhone.trim()) throw new Error("Sélectionnez un opérateur et saisissez votre numéro");
@@ -507,6 +538,10 @@ export default function DepositPage() {
   const openRobotPay = () => {
     if (!depositCountry) {
       toast({ title: "Pays requis", description: "Sélectionnez le pays du paiement.", variant: "destructive" });
+      return;
+    }
+    if (inpayAvailable) {
+      inpayInitiateMutation.mutate();
       return;
     }
     if (westpayAvailable) {

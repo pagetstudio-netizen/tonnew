@@ -32,6 +32,21 @@ import {
   formatMsisdn as westpayFormatMsisdn,
 } from "./westpay";
 import {
+  createPayin as inpayCreatePayin,
+  createPayout as inpayCreatePayout,
+  createOutTradeNo as inpayCreateOutTradeNo,
+  findVerifiedAccount as inpayFindVerifiedAccount,
+  getBalance as inpayGetBalance,
+  getInpayAccount,
+  getInpayEnabledCountries,
+  getCountryName as inpayGetCountryName,
+  isInpayConfigured,
+  isInpayCountryEnabled,
+  mapPayinStatus as mapInpayPayinStatus,
+  mapPayoutStatus as mapInpayPayoutStatus,
+  resolveBankCode as inpayResolveBankCode,
+} from "./inpay";
+import {
   collectPayment as ashtechCollect,
   getCountries as ashtechGetCountries,
   getTransaction as ashtechGetTransaction,
@@ -51,6 +66,16 @@ function getClientKey(req: Request): string {
   const forwarded = req.headers["x-forwarded-for"];
   const ip = typeof forwarded === "string" ? forwarded.split(",")[0].trim() : req.socket.remoteAddress || "unknown";
   return ip;
+}
+
+function getPublicBaseUrl(req: Request): string {
+  const devDomain = process.env.REPLIT_DEV_DOMAIN?.trim();
+  if (devDomain) return `https://${devDomain}`;
+
+  const forwardedProto = String(req.headers["x-forwarded-proto"] || req.protocol)
+    .split(",")[0]
+    .trim();
+  return `${forwardedProto}://${req.get("host")}`;
 }
 
 function checkBruteForce(req: Request, res: Response): boolean {
@@ -144,6 +169,10 @@ const SENSITIVE_SETTING_KEYS = new Set([
   "westpayWebhookSecret",
   "ashtechWebhookSecret",
 ]);
+const INPAY_COUNTRY_CODES = ["SN", "ML", "CI", "BF", "TG", "BJ", "GH", "CM", "CG", "KE", "TZ", "UG", "ZA"];
+const INPAY_MERCHANT_SETTING_KEYS = new Set(
+  INPAY_COUNTRY_CODES.map((country) => `inpayMerchantId_${country}`),
+);
 const PUBLIC_SETTING_KEYS = new Set([
   "supportLink", "supportType", "supportLabel",
   "support2Link", "support2Type", "support2Label",
@@ -156,12 +185,14 @@ const PUBLIC_SETTING_KEYS = new Set([
   "sendavapayEnabled", "sendavapayChannelName",
   "westpayEnabled", "westpayChannelName", "westpayCountries",
   "ashtechEnabled", "ashtechChannelName", "ashtechCountries",
+  "inpayEnabled", "inpayChannelName", "inpayCountries",
 ]);
 const ADMIN_SETTING_KEYS = new Set([
   ...Array.from(PUBLIC_SETTING_KEYS),
   "sendavapayWebhookSecret", "omnipayCallbackKey",
   "westpayWebhookSecret",
   "ashtechWebhookSecret",
+  ...Array.from(INPAY_MERCHANT_SETTING_KEYS),
 ]);
 const MASKED_SETTING_VALUE = "********";
 
@@ -651,6 +682,18 @@ export async function registerRoutes(
           gateway: "westpay",
         });
       }
+      const inpayEnabled = settings.inpayEnabled === "true";
+      const inpayChannelName = settings.inpayChannelName || "InPay";
+      if (inpayEnabled) {
+        virtualChannels.push({
+          id: -4,
+          name: inpayChannelName,
+          redirectUrl: "",
+          isApi: true,
+          isActive: true,
+          gateway: "inpay",
+        });
+      }
 
       // Manual channels created by admin (no gateway auto-processing)
       const manualChannels = channels.map((ch) => ({ ...ch, gateway: null }));
@@ -850,7 +893,7 @@ export async function registerRoutes(
   // Deposits
   app.post("/api/deposits", requireAuth, async (req, res) => {
     try {
-      const { amount, accountName, accountNumber, paymentMethod, country, paymentChannelId, useSoleaspay, useWestpay, otpCode,
+      const { amount, accountName, accountNumber, paymentMethod, country, paymentChannelId, useSoleaspay, useWestpay, useInpay, otpCode,
         paymentNumberId, channelName, screenshot, paymentMessage, reference } = req.body;
       const user = await storage.getUser(req.session.userId!);
       
@@ -994,6 +1037,57 @@ export async function registerRoutes(
         }
       }
 
+      // ── InPay: redirect-based hosted-payment flow ───────────────────────────
+      const inpayEnabledDeposit = settings.inpayEnabled === "true";
+      if (useInpay && inpayEnabledDeposit) {
+        const normalizedCountry = normalizedDeposit.country.trim().toUpperCase();
+        if (!isInpayCountryEnabled(normalizedCountry, settings)) {
+          return res.status(400).json({ message: "InPay n'est pas activé pour ce pays", inpay: true });
+        }
+        if (!isInpayConfigured(normalizedCountry, settings)) {
+          return res.status(400).json({
+            message: `InPay n'est pas configuré pour ${normalizedCountry} : URL API, merchant ID ou clé API manquant`,
+            inpay: true,
+          });
+        }
+
+        const inpayDeposit = await storage.createDeposit({
+          userId: req.session.userId!,
+          amount: normalizedDeposit.amount,
+          accountName: normalizedDeposit.accountName || user.fullName,
+          accountNumber: normalizedDeposit.accountNumber || user.phone,
+          country: normalizedCountry,
+          paymentMethod: "InPay",
+          paymentChannelId: normalizedDeposit.paymentChannelId && normalizedDeposit.paymentChannelId > 0 ? normalizedDeposit.paymentChannelId : null,
+          status: "processing",
+        });
+        const outTradeNo = inpayCreateOutTradeNo("PAYIN", inpayDeposit.id, user.id);
+        const account = getInpayAccount(normalizedCountry, settings);
+        try {
+          const result = await inpayCreatePayin({
+            amount: normalizedDeposit.amount,
+            country: normalizedCountry,
+            merchantId: account.merchantId,
+            apiKey: account.apiKey,
+            customerName: normalizedDeposit.accountName || user.fullName,
+            customerMobile: normalizedDeposit.accountNumber || user.phone,
+            customerEmail: `user${user.id}@tonnew.app`,
+            notificationUrl: `${getPublicBaseUrl(req)}/api/webhooks/inpay`,
+            outTradeNo,
+          });
+          const deposit = await storage.updateDeposit(inpayDeposit.id, {
+            status: "processing",
+            inpayOutTradeNo: outTradeNo,
+            inpayOrderNumber: result.orderNumber,
+          });
+          return res.json({ deposit, inpayUrl: result.url, inpay: true });
+        } catch (inpayError: any) {
+          await storage.updateDeposit(inpayDeposit.id, { status: "rejected", processedAt: new Date() });
+          console.error("[inpay] payin error:", inpayError);
+          return res.status(400).json({ message: inpayError.message || "Erreur InPay", inpay: true });
+        }
+      }
+
       const deposit = await storage.createDeposit({
         userId: req.session.userId!,
          amount: normalizedDeposit.amount,
@@ -1065,6 +1159,20 @@ export async function registerRoutes(
 
                 await storage.processDepositReferralCommissions(deposit.userId, deposit.amount);
               }
+
+async function refundRejectedWithdrawal(withdrawal: { id: number; userId: number; amount: number }) {
+  const user = await storage.getUser(withdrawal.userId);
+  if (!user) return;
+  await storage.updateUser(user.id, {
+    balance: (parseFloat(user.balance) + withdrawal.amount).toFixed(2),
+  });
+  await storage.createTransaction({
+    userId: user.id,
+    type: "withdrawal_refund",
+    amount: withdrawal.amount.toString(),
+    description: `Remboursement retrait InPay #${withdrawal.id}`,
+  });
+}
             }
           }
 
@@ -1660,6 +1768,59 @@ export async function registerRoutes(
     }
   );
 
+  // ── InPay webhooks (POST application/x-www-form-urlencoded, MD5 signature) ──
+  app.post("/api/webhooks/inpay", async (req, res) => {
+    try {
+      const settings = await storage.getSettings();
+      const payload = (req.body || {}) as Record<string, unknown>;
+      const account = inpayFindVerifiedAccount(payload, settings);
+      if (!account) {
+        console.warn("[inpay webhook] Signature invalide ou merchant inconnu");
+        return res.status(401).send("fail");
+      }
+
+      const outTradeNo = String(payload.out_trade_no || "");
+      if (!outTradeNo) return res.send("success");
+
+      // Both callback formats can contain order_number. Use our own reference
+      // prefix first so a payin callback can never be mistaken for a payout.
+      const callbackType = String(payload.type || payload.trade_type || "").toLowerCase();
+      const callbackStatus = String(payload.status || "").toLowerCase();
+      const isPayout =
+        outTradeNo.startsWith("PAYOUT-") ||
+        callbackType.includes("payout") ||
+        callbackStatus.startsWith("payout");
+      if (isPayout) {
+        const withdrawal = await storage.getWithdrawalByInpayOutTradeNo(outTradeNo);
+        if (!withdrawal) return res.send("success");
+
+        const status = mapInpayPayoutStatus(payload.status || payload.trade_status || payload.result);
+        if (status === "approved") {
+          await storage.claimWithdrawalFinalization(withdrawal.id, "approved");
+        } else if (status === "rejected" || String(payload.is_reverse) === "2") {
+          const claimed = await storage.claimWithdrawalFinalization(withdrawal.id, "rejected");
+          if (claimed) await refundRejectedWithdrawal(claimed);
+        }
+        return res.send("success");
+      }
+
+      const deposit = await storage.getDepositByInpayOutTradeNo(outTradeNo);
+      if (!deposit) return res.send("success");
+
+      const status = mapInpayPayinStatus(payload.status || payload.trade_status || payload.result);
+      if (status === "approved") {
+        const claimed = await storage.claimDepositApproval(deposit.id);
+        if (claimed) await creditApprovedDeposit(claimed);
+      } else if (status === "rejected") {
+        await storage.updateDeposit(deposit.id, { status: "rejected", processedAt: new Date() });
+      }
+      return res.send("success");
+    } catch (error: any) {
+      console.error("[inpay webhook] error:", error);
+      return res.status(500).send("fail");
+    }
+  });
+
   // Withdrawals
   app.post("/api/withdrawals", requireAuth, async (req, res) => {
     try {
@@ -2168,6 +2329,55 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/admin/withdrawals/:id/inpay", requireAdmin, async (req, res) => {
+    try {
+      const withdrawalId = parseInt(req.params.id);
+      const allWithdrawals = await storage.getWithdrawals();
+      const withdrawal = allWithdrawals.find((item) => item.id === withdrawalId);
+      if (!withdrawal) return res.status(404).json({ message: "Retrait non trouvé" });
+      if (withdrawal.status !== "pending") {
+        return res.status(409).json({ message: "Ce retrait a déjà été traité ou envoyé" });
+      }
+
+      const settings = await storage.getSettings();
+      const country = withdrawal.country.trim().toUpperCase();
+      if (!isInpayCountryEnabled(country, settings) || !isInpayConfigured(country, settings)) {
+        return res.status(400).json({ message: `InPay n'est pas configuré pour ${country}` });
+      }
+      const account = getInpayAccount(country, settings);
+      const bankCode = inpayResolveBankCode(country, withdrawal.paymentMethod);
+      const outTradeNo = inpayCreateOutTradeNo("PAYOUT", withdrawal.id, withdrawal.userId);
+      const result = await inpayCreatePayout({
+        amount: withdrawal.netAmount,
+        country,
+        merchantId: account.merchantId,
+        apiKey: account.apiKey,
+        customerName: withdrawal.accountName,
+        customerMobile: withdrawal.accountNumber,
+        customerEmail: `user${withdrawal.userId}@tonnew.app`,
+        bankCode,
+        accountNumber: withdrawal.accountNumber,
+        notificationUrl: `${getPublicBaseUrl(req)}/api/webhooks/inpay`,
+        outTradeNo,
+      });
+      const updated = await storage.updateWithdrawal(withdrawal.id, {
+        status: "processing",
+        inpayOutTradeNo: outTradeNo,
+        inpayOrderNumber: result.orderNumber || null,
+      });
+      await storage.logAdminAction(
+        req.session.userId!,
+        "send_withdrawal_to_inpay",
+        withdrawal.userId,
+        `Retrait ${withdrawal.id} envoyé à InPay (${country})`,
+      );
+      res.json(updated);
+    } catch (error: any) {
+      console.error("[inpay] payout error:", error);
+      res.status(400).json({ message: error.message || "Erreur d'envoi InPay" });
+    }
+  });
+
   app.get("/api/admin/users", requireAdmin, async (req, res) => {
     try {
       const search = (req.query.search as string) || "";
@@ -2430,6 +2640,25 @@ export async function registerRoutes(
       res.json(adminSettings(settings));
     } catch (error: any) {
       res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/admin/inpay/balance/:country", requireAdmin, async (req, res) => {
+    try {
+      const country = String(req.params.country).trim().toUpperCase();
+      const settings = await storage.getSettings();
+      if (!isInpayConfigured(country, settings)) {
+        return res.status(400).json({ message: `InPay n'est pas configuré pour ${country}` });
+      }
+      const account = getInpayAccount(country, settings);
+      const balance = await inpayGetBalance({
+        merchantId: account.merchantId,
+        apiKey: account.apiKey,
+      });
+      res.json({ country, name: inpayGetCountryName(country), balance });
+    } catch (error: any) {
+      console.error("[inpay] balance error:", error);
+      res.status(502).json({ message: error.message || "Impossible de consulter le solde InPay" });
     }
   });
 
