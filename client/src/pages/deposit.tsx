@@ -531,6 +531,17 @@ export default function DepositPage() {
       });
       return;
     }
+    if (
+      inpayAvailable &&
+      (!Number.isInteger(Number(amount)) || Number(amount) % 5 !== 0)
+    ) {
+      toast({
+        title: "Montant InPay invalide",
+        description: "Utilisez un montant entier multiple de 5 : 300, 305, 310…",
+        variant: "destructive",
+      });
+      return;
+    }
 
     openRobotPay();
   };

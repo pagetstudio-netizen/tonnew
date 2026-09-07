@@ -912,6 +912,15 @@ export async function registerRoutes(
        if (!Number.isFinite(requestedAmount) || requestedAmount < minDeposit) {
         return res.status(400).json({ message: `Montant minimum: ${minDeposit.toLocaleString()} FCFA` });
       }
+       if (
+         useInpay === true &&
+         (!Number.isInteger(requestedAmount) || requestedAmount % 5 !== 0)
+       ) {
+         return res.status(400).json({
+           message: "Le montant InPay doit être un nombre entier multiple de 5 (ex. 300, 305 ou 310 FCFA)",
+           inpay: true,
+         });
+       }
 
        const parsedDeposit = depositSchema.safeParse({
           amount: requestedAmount,
