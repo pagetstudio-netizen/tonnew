@@ -150,7 +150,8 @@ async function postInpay<T>(
   path: string,
   params: Record<string, unknown>,
 ): Promise<InpayApiResult<T>> {
-  const response = await fetch(`${getInpayApiBase()}${path}`, {
+  const endpoint = `${getInpayApiBase()}${path}`;
+  const response = await fetch(endpoint, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: formBody(params),
@@ -162,8 +163,15 @@ async function postInpay<T>(
     data = JSON.parse(body) as InpayApiResult<T>;
   } catch {
     if (contentType.includes("text/html") || /<html[\s>]/i.test(body)) {
+      const detail = body
+        .replace(/<script[\s\S]*?<\/script>/gi, " ")
+        .replace(/<style[\s\S]*?<\/style>/gi, " ")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, 300);
       throw new Error(
-        `L'API InPay a renvoyé une page HTML (HTTP ${response.status}). Vérifiez l'URL API et le chemin InPay configurés.`,
+        `L'API InPay a renvoyé une page HTML (HTTP ${response.status}) sur ${endpoint}${detail ? ` : ${detail}` : ""}`,
       );
     }
     const detail = body
