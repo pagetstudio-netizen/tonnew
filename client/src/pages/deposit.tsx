@@ -241,13 +241,14 @@ export default function DepositPage() {
   // ── Mutations ───────────────────────────────────────────────────────────────
 
   const copyPhone = async (number: PaymentNumber) => {
+    const value = number.paymentLink || number.phone || "";
     try {
-      await navigator.clipboard.writeText(number.phone);
+      await navigator.clipboard.writeText(value);
       setCopiedId(number.id);
       setTimeout(() => setCopiedId(null), 2000);
-      toast({ title: "Numéro copié !", description: `${number.phone} copié` });
+      toast({ title: number.paymentLink ? "Lien copié !" : "Numéro copié !", description: `${value} copié` });
     } catch {
-      toast({ title: "Numéro: " + number.phone, description: "Copiez ce numéro manuellement" });
+      toast({ title: number.paymentLink || "Numéro: " + number.phone, description: number.paymentLink ? "Ouvrez le lien pour payer" : "Copiez ce numéro manuellement" });
     }
   };
 
@@ -274,7 +275,9 @@ export default function DepositPage() {
         paymentMethod: selectedNumber.operatorName,
         country,
         paymentNumberId: selectedNumber.id,
-        channelName: `${selectedNumber.operatorName} - ${selectedNumber.phone}`,
+        channelName: selectedNumber.paymentLink
+          ? `${selectedNumber.operatorName} - Lien de paiement`
+          : `${selectedNumber.operatorName} - ${selectedNumber.phone}`,
         screenshot: screenshot || null,
         paymentMessage: paymentMessage || null,
         reference: reference || null,
@@ -878,8 +881,19 @@ export default function DepositPage() {
             </div>
           )}
           <div className="flex-1">
-            <p className="text-xs text-gray-500">Numéro destinataire</p>
-            <p className="font-bold text-[#00CC2C] text-sm">{selectedNumber.operatorName} — {selectedNumber.phone}</p>
+            <p className="text-xs text-gray-500">{selectedNumber.paymentLink ? "Lien de paiement" : "Numéro destinataire"}</p>
+            {selectedNumber.paymentLink ? (
+              <a
+                href={selectedNumber.paymentLink}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-1 flex items-center gap-1 text-sm font-bold text-[#00CC2C] underline"
+              >
+                <ExternalLink className="h-4 w-4" /> Ouvrir le lien de paiement
+              </a>
+            ) : (
+              <p className="font-bold text-[#00CC2C] text-sm">{selectedNumber.operatorName} — {selectedNumber.phone}</p>
+            )}
             <p className="text-xs text-gray-500">{selectedNumber.ownerName}</p>
           </div>
           <div className="text-right">
