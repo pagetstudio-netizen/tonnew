@@ -1067,10 +1067,13 @@ export async function registerRoutes(
             inpay: true,
           });
         }
-        const parsedInpayPhone = phoneNumberSchema.safeParse(inpayPhone);
+        const inpayPhoneValue = typeof inpayPhone === "string" && inpayPhone.trim()
+          ? inpayPhone.trim()
+          : normalizedDeposit.accountNumber || user.phone;
+        const parsedInpayPhone = phoneNumberSchema.safeParse(inpayPhoneValue);
         if (!parsedInpayPhone.success) {
           return res.status(400).json({
-            message: `Le numéro Mobile Money de ${normalizedCountry} est requis et doit être valide`,
+            message: "Le numéro du compte est invalide",
             inpay: true,
           });
         }

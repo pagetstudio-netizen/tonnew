@@ -57,7 +57,6 @@ export default function DepositPage() {
 
   const [amount, setAmount] = useState<number | "">("");
   const [depositCountry, setDepositCountry] = useState("");
-  const [inpayPhone, setInpayPhone] = useState("");
   const [senderPhone, setSenderPhone] = useState(user?.phone || "");
   const [screenshot, setScreenshot] = useState<string>("");
   const [screenshotName, setScreenshotName] = useState("");
@@ -91,18 +90,6 @@ export default function DepositPage() {
   const [ashtechPolling, setAshtechPolling] = useState(false);
 
   const country = depositCountry;
-
-  useEffect(() => {
-    if (!depositCountry) {
-      setInpayPhone("");
-      return;
-    }
-    setInpayPhone(
-      user?.country?.toUpperCase() === depositCountry.toUpperCase()
-        ? user?.phone || ""
-        : "",
-    );
-  }, [depositCountry, user?.country, user?.phone]);
 
   const { data: apiCountries = [] } = useQuery<ApiCountry[]>({
     queryKey: ["/api/countries"],
@@ -360,17 +347,13 @@ export default function DepositPage() {
 
   const inpayInitiateMutation = useMutation({
     mutationFn: async () => {
-      if (!inpayPhone.trim()) {
-        throw new Error(`Saisissez un numéro Mobile Money de ${countryInfo?.name || "ce pays"}`);
-      }
       const res = await apiRequest("POST", "/api/deposits", {
         amount: Number(amount),
         accountName: user?.fullName || "",
-        accountNumber: inpayPhone.trim(),
+        accountNumber: user?.phone || "",
         paymentMethod: "InPay",
         country,
         useInpay: true,
-        inpayPhone: inpayPhone.trim(),
       });
       if (!res.ok) {
         const d = await res.json();
@@ -828,29 +811,6 @@ export default function DepositPage() {
             ))}
           </select>
         </section>
-
-        {inpayAvailable && (
-          <section className="mx-auto mt-3 w-[88%]" aria-label="Numéro InPay">
-            <label htmlFor="inpay-phone" className="mb-2 block text-sm font-semibold text-gray-800">
-              Numéro Mobile Money du pays choisi
-            </label>
-            <div className="flex items-center overflow-hidden rounded-lg border border-gray-300 bg-white">
-              <Phone className="ml-4 h-4 w-4 flex-shrink-0 text-gray-400" />
-              <input
-                id="inpay-phone"
-                type="tel"
-                inputMode="numeric"
-                value={inpayPhone}
-                onChange={(event) => setInpayPhone(event.target.value)}
-                placeholder={`Numéro ${countryInfo?.name || "du pays"}`}
-                className="flex-1 bg-transparent px-3 py-3 text-sm text-gray-700 outline-none"
-              />
-            </div>
-            <p className="mt-1 text-xs text-gray-500">
-              Ce numéro peut être différent de celui de votre compte.
-            </p>
-          </section>
-        )}
 
         <button
           className="continue"
