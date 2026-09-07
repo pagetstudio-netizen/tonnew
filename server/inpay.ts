@@ -201,6 +201,12 @@ function timestamp(): string {
   return String(Math.floor(Date.now() / 1000));
 }
 
+function normalizeInpayMobile(value: string, country: string): string {
+  const digits = String(value || "").replace(/\D/g, "");
+  const prefix = INPAY_COUNTRY_PREFIXES[country.toUpperCase()] || "";
+  return prefix && digits.startsWith(prefix) ? digits.slice(prefix.length) : digits;
+}
+
 function orderReference(prefix: string, id: number, userId: number): string {
   return `${prefix}-${id}-${userId}-${Date.now()}`;
 }
@@ -223,7 +229,7 @@ export async function createPayin(params: {
     notification_url: params.notificationUrl,
     timestamp: timestamp(),
     client_name: params.customerName,
-    client_mobile: params.customerMobile,
+    client_mobile: normalizeInpayMobile(params.customerMobile, params.country),
     client_email: params.customerEmail,
     country_prefix: INPAY_COUNTRY_PREFIXES[params.country.toUpperCase()] || "",
   };
@@ -287,7 +293,7 @@ export async function createPayout(params: {
     notification_url: params.notificationUrl,
     timestamp: timestamp(),
     client_name: params.customerName,
-    client_mobile: params.customerMobile,
+    client_mobile: normalizeInpayMobile(params.customerMobile, params.country),
     client_email: params.customerEmail,
     country_prefix: INPAY_COUNTRY_PREFIXES[params.country.toUpperCase()] || "",
     bank_code: params.bankCode,

@@ -74,6 +74,9 @@ function getClientKey(req: Request): string {
 }
 
 function getPublicBaseUrl(req: Request): string {
+  const configuredUrl = process.env.PUBLIC_APP_URL?.trim().replace(/\/+$/, "");
+  if (configuredUrl) return configuredUrl;
+
   const devDomain = process.env.REPLIT_DEV_DOMAIN?.trim();
   if (devDomain) return `https://${devDomain}`;
 
