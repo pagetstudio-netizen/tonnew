@@ -2,8 +2,8 @@ from pathlib import Path
 
 import fitz
 
-pdf_path = Path("attached_assets/Inpay_documentation__1788767551669.pdf")
-output_dir = Path(".agents/outputs/inpay-latest-pdf")
+pdf_path = Path("attached_assets/Inpay_documentation__1788596477512.pdf")
+output_dir = Path(".agents/outputs/inpay-pdf")
 output_dir.mkdir(parents=True, exist_ok=True)
 
 document = fitz.open(pdf_path)
