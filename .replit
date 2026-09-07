@@ -55,8 +55,3 @@ expertMode = true
 [postMerge]
 path = "scripts/post-merge.sh"
 timeoutMs = 120000
-
-[userenv]
-
-[userenv.shared]
-INPAY_API_BASE_URL = "https://t178765840988910tonnew.inpayafrica.net"
