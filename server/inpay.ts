@@ -70,7 +70,7 @@ export function getInpayApiBase(): string {
 }
 
 function settingMerchantId(settings: Record<string, string>, country: string): string {
-  return settings[`inpayMerchantId_${country}`] || process.env[`${MERCHANT_ENV_PREFIX}${country}`] || "";
+  return process.env[`${MERCHANT_ENV_PREFIX}${country}`] || settings[`inpayMerchantId_${country}`] || "";
 }
 
 export function getInpayAccount(
