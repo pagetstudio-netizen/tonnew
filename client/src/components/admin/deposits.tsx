@@ -94,6 +94,8 @@ export default function AdminDeposits() {
     d.user.phone.includes(filter) ||
     d.user.fullName.toLowerCase().includes(filter.toLowerCase()) ||
     (d.reference && d.reference.toLowerCase().includes(filter.toLowerCase())) ||
+    ((d as any).inpayOutTradeNo && (d as any).inpayOutTradeNo.toLowerCase().includes(filter.toLowerCase())) ||
+    ((d as any).inpayOrderNumber && (d as any).inpayOrderNumber.toLowerCase().includes(filter.toLowerCase())) ||
     ((d as any).channelName && (d as any).channelName.toLowerCase().includes(filter.toLowerCase())) ||
     String(d.id).includes(filter)
   ) || [];
@@ -211,6 +213,18 @@ export default function AdminDeposits() {
                       <div className="col-span-2">
                         <p className="text-muted-foreground text-xs">Référence AshtechPay</p>
                         <p className="font-mono font-medium">{(deposit as any).ashtechReference}</p>
+                      </div>
+                    )}
+                    {(deposit as any).inpayOutTradeNo && (
+                      <div className="col-span-2">
+                        <p className="text-muted-foreground text-xs">Référence marchand InPay</p>
+                        <p className="font-mono font-medium">{(deposit as any).inpayOutTradeNo}</p>
+                      </div>
+                    )}
+                    {(deposit as any).inpayOrderNumber && (
+                      <div className="col-span-2">
+                        <p className="text-muted-foreground text-xs">N° commande InPay</p>
+                        <p className="font-mono font-medium">{(deposit as any).inpayOrderNumber}</p>
                       </div>
                     )}
                     {isAshtech && ashtechExpired && deposit.status !== "approved" && (

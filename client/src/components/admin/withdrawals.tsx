@@ -89,7 +89,9 @@ export default function AdminWithdrawals() {
   const filteredWithdrawals = withdrawals?.filter(w =>
     w.accountNumber.includes(filter) ||
     w.user.phone.includes(filter) ||
-    w.user.fullName.toLowerCase().includes(filter.toLowerCase())
+    w.user.fullName.toLowerCase().includes(filter.toLowerCase()) ||
+    ((w as any).inpayOutTradeNo && (w as any).inpayOutTradeNo.toLowerCase().includes(filter.toLowerCase())) ||
+    ((w as any).inpayOrderNumber && (w as any).inpayOrderNumber.toLowerCase().includes(filter.toLowerCase()))
   ) || [];
 
   return (
@@ -192,6 +194,18 @@ export default function AdminWithdrawals() {
                       })}
                     </p>
                   </div>
+                  {(withdrawal as any).inpayOutTradeNo && (
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground">Référence marchand InPay</p>
+                      <p className="font-mono font-medium text-foreground">{(withdrawal as any).inpayOutTradeNo}</p>
+                    </div>
+                  )}
+                  {(withdrawal as any).inpayOrderNumber && (
+                    <div className="col-span-2">
+                      <p className="text-muted-foreground">N° commande InPay</p>
+                      <p className="font-mono font-medium text-foreground">{(withdrawal as any).inpayOrderNumber}</p>
+                    </div>
+                  )}
                 </div>
 
                 {withdrawal.status === "pending" && (
