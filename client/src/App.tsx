@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, useLocation, Redirect } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -5,39 +6,48 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import BottomNav from "@/components/bottom-nav";
-import LoginPage from "@/pages/login";
-import RegisterPage from "@/pages/register";
-import HomePage from "@/pages/home";
-import TasksPage from "@/pages/tasks";
-import InvestPage from "@/pages/invest";
-import OrdersPage from "@/pages/orders";
-import TeamPage from "@/pages/team";
-import AccountPage from "@/pages/account";
-import AdminPage from "@/pages/admin";
-import AdminTeamPage from "@/pages/admin-team";
-import BankerPage from "@/pages/banker";
-import DepositPage from "@/pages/deposit";
-import RobotPayPage from "@/pages/robotpay";
-import WithdrawalPage from "@/pages/withdrawal";
-import DepositHistoryPage from "@/pages/deposit-history";
-import DepositsHistoryPage from "@/pages/deposit-history-real";
-import HistoryPage from "@/pages/history";
-import ServicePage from "@/pages/service";
 import { ADMIN_PATH } from "@/lib/admin-path";
-import WalletPage from "@/pages/wallet";
-import ChangePasswordPage from "@/pages/change-password";
-import AboutPage from "@/pages/about";
-import RulesPage from "@/pages/rules";
-import GiftCodePage from "@/pages/gift-code";
-import TeamDetailsPage from "@/pages/team-details";
-import MyProductsPage from "@/pages/my-products";
-import CheckinPage from "@/pages/checkin";
-import RewardsPage from "@/pages/rewards";
-import WithdrawalHistoryPage from "@/pages/withdrawal-history";
-import DepositOrdersPage from "@/pages/deposit-orders";
-import SalaryBonusPage from "@/pages/salary-bonus";
-import NotFound from "@/pages/not-found";
 import { Loader2 } from "lucide-react";
+
+const LoginPage = lazy(() => import("@/pages/login"));
+const RegisterPage = lazy(() => import("@/pages/register"));
+const HomePage = lazy(() => import("@/pages/home"));
+const TasksPage = lazy(() => import("@/pages/tasks"));
+const InvestPage = lazy(() => import("@/pages/invest"));
+const OrdersPage = lazy(() => import("@/pages/orders"));
+const TeamPage = lazy(() => import("@/pages/team"));
+const AccountPage = lazy(() => import("@/pages/account"));
+const AdminPage = lazy(() => import("@/pages/admin"));
+const AdminTeamPage = lazy(() => import("@/pages/admin-team"));
+const BankerPage = lazy(() => import("@/pages/banker"));
+const DepositPage = lazy(() => import("@/pages/deposit"));
+const RobotPayPage = lazy(() => import("@/pages/robotpay"));
+const WithdrawalPage = lazy(() => import("@/pages/withdrawal"));
+const DepositHistoryPage = lazy(() => import("@/pages/deposit-history"));
+const DepositsHistoryPage = lazy(() => import("@/pages/deposit-history-real"));
+const HistoryPage = lazy(() => import("@/pages/history"));
+const ServicePage = lazy(() => import("@/pages/service"));
+const WalletPage = lazy(() => import("@/pages/wallet"));
+const ChangePasswordPage = lazy(() => import("@/pages/change-password"));
+const AboutPage = lazy(() => import("@/pages/about"));
+const RulesPage = lazy(() => import("@/pages/rules"));
+const GiftCodePage = lazy(() => import("@/pages/gift-code"));
+const TeamDetailsPage = lazy(() => import("@/pages/team-details"));
+const MyProductsPage = lazy(() => import("@/pages/my-products"));
+const CheckinPage = lazy(() => import("@/pages/checkin"));
+const RewardsPage = lazy(() => import("@/pages/rewards"));
+const WithdrawalHistoryPage = lazy(() => import("@/pages/withdrawal-history"));
+const DepositOrdersPage = lazy(() => import("@/pages/deposit-orders"));
+const SalaryBonusPage = lazy(() => import("@/pages/salary-bonus"));
+const NotFound = lazy(() => import("@/pages/not-found"));
+
+function PageLoading() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, isLoading } = useAuth();
@@ -339,7 +349,9 @@ function App() {
       <TooltipProvider>
         <AuthProvider>
           <BrandThemeScope>
-            <Router />
+            <Suspense fallback={<PageLoading />}>
+              <Router />
+            </Suspense>
             <Toaster />
           </BrandThemeScope>
         </AuthProvider>

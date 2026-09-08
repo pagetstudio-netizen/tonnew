@@ -126,6 +126,27 @@ function getBlockedIps(value: string | undefined): string[] {
     return [];
   }
 }
+
+const BLOCKED_IP_CACHE_TTL_MS = 15_000;
+let blockedIpsCache: { values: string[]; expiresAt: number } | null = null;
+
+async function getCachedBlockedIps(): Promise<string[]> {
+  const now = Date.now();
+  if (blockedIpsCache && blockedIpsCache.expiresAt > now) {
+    return blockedIpsCache.values;
+  }
+
+  const values = getBlockedIps(await storage.getSetting("blockedIps"));
+  blockedIpsCache = { values, expiresAt: now + BLOCKED_IP_CACHE_TTL_MS };
+  return values;
+}
+
+function updateBlockedIpsCache(values: string[]) {
+  blockedIpsCache = {
+    values,
+    expiresAt: Date.now() + BLOCKED_IP_CACHE_TTL_MS,
+  };
+}
 // --- end brute-force protection ---
 
 async function creditApprovedDeposit(deposit: { id: number; userId: number; amount: number }) {
@@ -288,7 +309,7 @@ export async function registerRoutes(
 
   app.use(async (req, res, next) => {
     try {
-      const blockedIps = getBlockedIps(await storage.getSetting("blockedIps"));
+      const blockedIps = await getCachedBlockedIps();
       if (blockedIps.includes(getClientKey(req))) {
         return res.status(403).json({ message: "Accès bloqué pour cette adresse IP" });
       }
@@ -2741,7 +2762,7 @@ async function refundRejectedWithdrawal(withdrawal: { id: number; userId: number
 
   app.get("/api/admin/blocked-ips", requireAdmin, async (_req, res) => {
     try {
-      res.json(getBlockedIps(await storage.getSetting("blockedIps")));
+      res.json(await getCachedBlockedIps());
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -2752,10 +2773,11 @@ async function refundRejectedWithdrawal(withdrawal: { id: number; userId: number
       const ip = String(req.body?.ip || "").trim();
       const net = await import("net");
       if (!net.isIP(ip)) return res.status(400).json({ message: "Adresse IP invalide" });
-      const blockedIps = getBlockedIps(await storage.getSetting("blockedIps"));
+      const blockedIps = [...await getCachedBlockedIps()];
       if (!blockedIps.includes(ip)) {
         blockedIps.push(ip);
         await storage.setSetting("blockedIps", JSON.stringify(blockedIps), req.session.userId);
+        updateBlockedIpsCache(blockedIps);
       }
       await storage.logAdminAction(req.session.userId!, "block_ip", null, `Adresse IP bloquée: ${ip}`);
       res.json({ success: true, ip });
@@ -2767,9 +2789,10 @@ async function refundRejectedWithdrawal(withdrawal: { id: number; userId: number
   app.delete("/api/admin/blocked-ips/:ip", requireAdmin, async (req, res) => {
     try {
       const ip = decodeURIComponent(req.params.ip);
-      const blockedIps = getBlockedIps(await storage.getSetting("blockedIps"));
+      const blockedIps = await getCachedBlockedIps();
       const nextIps = blockedIps.filter((value) => value !== ip);
       await storage.setSetting("blockedIps", JSON.stringify(nextIps), req.session.userId);
+      updateBlockedIpsCache(nextIps);
       await storage.logAdminAction(req.session.userId!, "unblock_ip", null, `Adresse IP débloquée: ${ip}`);
       res.json({ success: true, ip });
     } catch (error: any) {
