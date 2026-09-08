@@ -5,7 +5,7 @@ import { Check, ChevronRight, ClipboardCheck, Copy, ExternalLink, ImageIcon, Loa
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { COUNTRIES, type ApiCountry } from "@/lib/countries";
+import type { ApiCountry } from "@/lib/countries";
 import type { PaymentNumber } from "@shared/schema";
 
 type Provider = "ashtech" | "sendavapay";
@@ -73,7 +73,7 @@ export default function RobotPayPage() {
   const provider = providerInfo?.provider || "sendavapay";
   const activeProvider = operator?.provider || provider;
   const availableProviders = providerInfo?.providers || (providerInfo ? [{ provider: providerInfo.provider, name: providerInfo.name }] : []);
-  const countryInfo = countries.find(c => c.code === country) || COUNTRIES.find(c => c.code === country);
+  const countryInfo = countries.find(c => c.code === country && c.isActive);
   const currency = countryInfo?.currency || "FCFA";
   const phonePrefix = countryInfo && "phonePrefix" in countryInfo ? countryInfo.phonePrefix : "";
   const paymentPhone = phone.trim().startsWith("+")

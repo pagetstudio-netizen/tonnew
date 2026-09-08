@@ -8,7 +8,7 @@ import {
   ImageIcon, ArrowRight, Zap, RefreshCw, ExternalLink,
 } from "lucide-react";
 import { Link } from "wouter";
-import { COUNTRIES, type ApiCountry } from "@/lib/countries";
+import type { ApiCountry } from "@/lib/countries";
 import type { PaymentNumber } from "@shared/schema";
 import rechargeReference from "@assets/IMG-20260821-WA0163_1787357122336.jpg";
 import historyIcon from "@assets/20260410_193219_1787363717022.png";
@@ -95,9 +95,7 @@ export default function DepositPage() {
     queryKey: ["/api/countries"],
   });
 
-  const countryInfo = apiCountries.length > 0
-    ? apiCountries.find(c => c.code === country && c.isActive)
-    : COUNTRIES.find(c => c.code === country);
+  const countryInfo = apiCountries.find(c => c.code === country && c.isActive);
   const currency = countryInfo?.currency || "FCFA";
 
   const { data: platformSettings } = useQuery<Record<string, string>>({
@@ -126,10 +124,7 @@ export default function DepositPage() {
     ashtechCountriesSetting.split(",").map(c => c.trim().toUpperCase()).includes(country.toUpperCase());
   const ashtechAvailable = ashtechEnabled && ashtechCountryAllowed;
 
-  const activeDepositCountries = (apiCountries.length > 0
-    ? apiCountries.filter(c => c.isActive)
-    : COUNTRIES
-  ) as Array<{ code: string; name: string; currency: string }>;
+  const activeDepositCountries = apiCountries.filter(c => c.isActive) as Array<{ code: string; name: string; currency: string }>;
   const ashtechConfiguredCountryCodes = ashtechCountriesSetting
     ? ashtechCountriesSetting.split(",").map(c => c.trim().toUpperCase()).filter(Boolean)
     : null;

@@ -45,14 +45,14 @@ export default function RegisterPage() {
     resolver: zodResolver(registerSchema),
     defaultValues: {
       phone: "",
-      country: "TD",
+      country: "",
       password: "",
       confirmPassword: "",
       invitationCode: refCode,
     },
   });
 
-  const { data: apiCountries } = useQuery<ApiCountry[]>({
+  const { data: apiCountries, isLoading: countriesLoading } = useQuery<ApiCountry[]>({
     queryKey: ["/api/countries"],
   });
 
@@ -96,7 +96,7 @@ export default function RegisterPage() {
     }
   }
 
-  const displayedPrefix = countryData?.phonePrefix || "228";
+  const displayedPrefix = countryData?.phonePrefix || (countriesLoading ? "..." : "");
 
   return (
     <main className="auth-reference auth-register">

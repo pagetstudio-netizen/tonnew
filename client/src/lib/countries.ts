@@ -1,17 +1,20 @@
-// Fallback country data (used if API not available)
-export const COUNTRIES = [
-  { code: "TG", name: "Togo", flag: "TG", currency: "XOF", paymentMethods: ["TMoney", "Flooz"] },
-  { code: "TD", name: "Tchad", flag: "TD", currency: "XAF", paymentMethods: ["Airtel Tchad", "Moov Africa Tchad"] },
-  { code: "NE", name: "Niger", flag: "NE", currency: "XOF", paymentMethods: ["NITA TRANSFERT", "AMANA TRANSFERT"] },
-  { code: "CF", name: "Centrafrique", flag: "CF", currency: "XAF", paymentMethods: ["Telecel Centrafrique", "Orange Centrafrique"] },
-];
+// Countries are managed by the database and loaded from /api/countries.
+// Keep these arrays empty so stale country data can never flash while the API loads.
+export const COUNTRIES: Array<{
+  code: string;
+  name: string;
+  flag: string;
+  currency: string;
+  paymentMethods: string[];
+}> = [];
 
-export const FALLBACK_COUNTRIES = [
-  { code: "TG", name: "Togo", currency: "XOF", phonePrefix: "228", operators: ["TMoney", "Flooz"] },
-  { code: "TD", name: "Tchad", currency: "XAF", phonePrefix: "235", operators: ["Airtel Tchad", "Moov Africa Tchad"] },
-  { code: "NE", name: "Niger", currency: "XOF", phonePrefix: "227", operators: ["NITA TRANSFERT", "AMANA TRANSFERT"] },
-  { code: "CF", name: "Centrafrique", currency: "XAF", phonePrefix: "236", operators: ["Telecel Centrafrique", "Orange Centrafrique"] },
-];
+export const FALLBACK_COUNTRIES: Array<{
+  code: string;
+  name: string;
+  currency: string;
+  phonePrefix: string;
+  operators: string[];
+}> = [];
 
 // Legacy compatibility - kept for places still using ELIGIBLE_COUNTRIES directly
 export const ELIGIBLE_COUNTRIES = FALLBACK_COUNTRIES.map(c => ({

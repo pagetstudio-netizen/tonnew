@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { FALLBACK_COUNTRIES, type ApiCountry } from "@/lib/countries";
-import { Check, Search, X } from "lucide-react";
+import type { ApiCountry } from "@/lib/countries";
+import { Check, Loader2, Search, X } from "lucide-react";
 
 interface CountrySelectorProps {
   open: boolean;
@@ -12,16 +12,16 @@ interface CountrySelectorProps {
 
 export function CountrySelector({ open, onClose, onSelect, selectedCountryCode }: CountrySelectorProps) {
   const [search, setSearch] = useState("");
-  const { data: apiCountries } = useQuery<ApiCountry[]>({
+  const { data: apiCountries, isLoading, isError } = useQuery<ApiCountry[]>({
     queryKey: ["/api/countries"],
     enabled: open,
   });
 
   if (!open) return null;
 
-  const countries = (apiCountries && apiCountries.length > 0
-    ? apiCountries.filter(c => c.isActive).map(c => ({ code: c.code, name: c.name, phonePrefix: c.phonePrefix }))
-    : FALLBACK_COUNTRIES.map(c => ({ code: c.code, name: c.name, phonePrefix: c.phonePrefix })))
+  const countries = (apiCountries || [])
+    .filter(c => c.isActive)
+    .map(c => ({ code: c.code, name: c.name, phonePrefix: c.phonePrefix }))
     .filter(country => {
       const query = search.trim().toLowerCase();
       return !query || country.name.toLowerCase().includes(query) || country.phonePrefix.includes(query);
@@ -50,7 +50,14 @@ export function CountrySelector({ open, onClose, onSelect, selectedCountryCode }
           />
         </div>
         <div className="country-picker-list">
-          {countries.map((country) => {
+          {isLoading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              <span>Chargement des pays...</span>
+            </div>
+          ) : isError ? (
+            <p className="country-picker-empty">Impossible de charger les pays.</p>
+          ) : countries.map((country) => {
             const selected = country.code === selectedCountryCode;
             return (
               <button
@@ -64,7 +71,7 @@ export function CountrySelector({ open, onClose, onSelect, selectedCountryCode }
               </button>
             );
           })}
-          {countries.length === 0 && <p className="country-picker-empty">Aucun pays trouvé</p>}
+          {!isLoading && !isError && countries.length === 0 && <p className="country-picker-empty">Aucun pays disponible</p>}
         </div>
       </section>
     </div>

@@ -30,12 +30,12 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
     defaultValues: {
       phone: "",
-      country: "TG",
+      country: "",
       password: "",
     },
   });
 
-  const { data: apiCountries } = useQuery<ApiCountry[]>({
+  const { data: apiCountries, isLoading: countriesLoading } = useQuery<ApiCountry[]>({
     queryKey: ["/api/countries"],
   });
 
@@ -80,7 +80,7 @@ export default function LoginPage() {
     }
   }
 
-  const displayedPrefix = countryData?.phonePrefix || "228";
+  const displayedPrefix = countryData?.phonePrefix || (countriesLoading ? "..." : "");
 
   return (
     <main className="auth-reference auth-login">
