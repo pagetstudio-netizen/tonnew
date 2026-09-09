@@ -7,3 +7,4 @@
 - [TON green theme](ton-green-theme.md) — Apply TON green branding outside the dashboard; keep the dashboard’s current visual identity unchanged.
 - [InPay callback classification](inpay-callbacks.md) — InPay payin and payout callbacks can both include order_number; classify using the merchant reference prefix first.
 - [InPay IP whitelist](inpay-ip-whitelist.md) — InPay rejects API calls with errno 5 until the server's public egress IP is whitelisted.
+- [AshtechPay Burkina flow](ashtechpay-burkina.md) — BF uses exact operator names and requires the returned reference on OTP retries.

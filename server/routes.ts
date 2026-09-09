@@ -1331,11 +1331,12 @@ async function refundRejectedWithdrawal(withdrawal: { id: number; userId: number
       const requestedAshtechReference = typeof requestedReference === "string"
         ? requestedReference.trim()
         : "";
-      const reference = existingDeposit?.ashtechReference?.startsWith("paget-studio-")
-        ? existingDeposit.ashtechReference
-        : requestedAshtechReference.startsWith("paget-studio-")
-          ? requestedAshtechReference
-          : generatedReference;
+      // AshtechPay requires the exact reference returned by an
+      // `otp_required` response on the retry request. Preserve the reference
+      // already stored on a deposit before generating a new one.
+      const reference = existingDeposit?.ashtechReference?.trim()
+        || requestedAshtechReference
+        || generatedReference;
       const notifyBaseUrl = process.env.PUBLIC_APP_URL || "https://Tonnew.top";
       const result = await ashtechCollect({
         amount: numericAmount,
@@ -1399,6 +1400,9 @@ async function refundRejectedWithdrawal(withdrawal: { id: number; userId: number
         const otpExistingDeposit = requestDepositId
           ? await storage.getDeposit(Number(requestDepositId))
           : undefined;
+        if (otpExistingDeposit && otpExistingDeposit.userId !== otpUser.id) {
+          return res.status(403).json({ message: "Accès refusé" });
+        }
         const otpReference = String(error.data.reference || "").trim();
         if (!otpReference) {
           return res.status(400).json({ message: error.message || "Référence OTP AshtechPay manquante" });
