@@ -1171,7 +1171,7 @@ export default function DepositPage() {
             onChange={(e) => { setSvCountry(e.target.value); setSvOperator(null); }}
             className="w-full border border-gray-300 rounded-md px-4 py-4 text-sm text-gray-700 outline-none bg-white appearance-none"
           >
-            {(apiCountries.length > 0 ? apiCountries.filter(c => c.isActive) : COUNTRIES).map((c: any) => (
+            {activeDepositCountries.map((c: any) => (
               <option key={c.code} value={c.code}>{c.name}</option>
             ))}
           </select>
